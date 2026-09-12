@@ -21,3 +21,7 @@ cmake_install.cmake
 # 临时文件
 gh_login.txt
 *.log
+
+# 安装程序产物
+*.exe
+Breeze-*-Setup.exe
