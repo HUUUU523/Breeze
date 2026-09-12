@@ -21,13 +21,21 @@ jobs:
         with:
           version: '6.8.1'
           arch: 'win64_msvc2022_64'
-          modules: 'qtwebenginewidgets qtwebchannel qtpositioning'
+          modules: 'qtwebengine qtwebchannel qtpositioning'
           cache: true
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1.13.0
         with:
           arch: x64
+
+      - name: List Qt cmake modules
+        run: |
+          Write-Host "QT_ROOT_DIR = $env:QT_ROOT_DIR"
+          Write-Host "--- lib/cmake 下的 Qt6* ---"
+          Get-ChildItem "$env:QT_ROOT_DIR\lib\cmake" -Directory -Filter "Qt6*" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
+          Write-Host "--- 查找 WebEngine ---"
+          Get-ChildItem "$env:QT_ROOT_DIR" -Recurse -Filter "*WebEngine*" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName | Select-Object -First 20
 
       - name: Configure CMake
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
