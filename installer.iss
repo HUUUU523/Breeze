@@ -34,7 +34,6 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 ; 只打包运行必需文件，排除构建中间产物
 Source: "build\Breeze.exe";           DestDir: "{app}"; Flags: ignoreversion
-Source: "build\Breeze.exe.manifest";  DestDir: "{app}"; Flags: ignoreversion
 Source: "build\*.dll";                DestDir: "{app}"; Flags: ignoreversion
 Source: "build\QtWebEngineProcess.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; 资源与插件目录
