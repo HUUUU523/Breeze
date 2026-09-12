@@ -36,18 +36,18 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "build\Breeze.exe";           DestDir: "{app}"; Flags: ignoreversion
 Source: "build\*.dll";                DestDir: "{app}"; Flags: ignoreversion
 Source: "build\QtWebEngineProcess.exe"; DestDir: "{app}"; Flags: ignoreversion
-; 资源与插件目录
-Source: "build\resources\*";     DestDir: "{app}\resources";     Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "build\platforms\*";     DestDir: "{app}\platforms";     Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "build\styles\*";        DestDir: "{app}\styles";        Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "build\tls\*";           DestDir: "{app}\tls";           Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "build\imageformats\*";  DestDir: "{app}\imageformats";  Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "build\generic\*";       DestDir: "{app}\generic";       Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "build\networkinformation\*"; DestDir: "{app}\networkinformation"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "build\position\*";      DestDir: "{app}\position";      Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "build\translations\*";  DestDir: "{app}\translations";  Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "build\qml\*";           DestDir: "{app}\qml";           Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "build\qmltooling\*";    DestDir: "{app}\qmltooling";    Flags: ignoreversion recursesubdirs createallsubdirs
+; 资源与插件目录（不存在的自动跳过）
+Source: "build\resources\*";     DestDir: "{app}\resources";     Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "build\platforms\*";     DestDir: "{app}\platforms";     Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "build\styles\*";        DestDir: "{app}\styles";        Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "build\tls\*";           DestDir: "{app}\tls";           Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "build\imageformats\*";  DestDir: "{app}\imageformats";  Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "build\generic\*";       DestDir: "{app}\generic";       Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "build\networkinformation\*"; DestDir: "{app}\networkinformation"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "build\position\*";      DestDir: "{app}\position";      Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "build\translations\*";  DestDir: "{app}\translations";  Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "build\qml\*";           DestDir: "{app}\qml";           Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "build\qmltooling\*";    DestDir: "{app}\qmltooling";    Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
