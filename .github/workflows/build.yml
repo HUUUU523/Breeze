@@ -29,6 +29,12 @@ jobs:
         with:
           arch: x64
 
+      - name: Debug Qt path
+        run: |
+          Write-Host "QT_ROOT_DIR = $env:QT_ROOT_DIR"
+          Write-Host "Qt6_DIR = $env:Qt6_DIR"
+          if (Test-Path "$env:QT_ROOT_DIR") { Write-Host "QT_ROOT_DIR exists" } else { Write-Host "QT_ROOT_DIR NOT FOUND" }
+
       - name: Configure CMake
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
 
