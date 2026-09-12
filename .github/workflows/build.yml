@@ -21,21 +21,13 @@ jobs:
         with:
           version: '6.8.1'
           arch: 'win64_msvc2022_64'
-          modules: 'qtwebengine qtwebchannel qtpositioning'
+          modules: 'qtwebenginewidgets qtwebchannel qtpositioning'
           cache: true
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1.13.0
         with:
           arch: x64
-
-      - name: Debug Qt modules
-        run: |
-          Write-Host "QT_ROOT_DIR = $env:QT_ROOT_DIR"
-          Write-Host "--- lib/cmake 内容 ---"
-          Get-ChildItem "$env:QT_ROOT_DIR\lib\cmake" -Directory | Select-Object -ExpandProperty Name
-          Write-Host "--- 是否有 WebEngineWidgets ---"
-          Test-Path "$env:QT_ROOT_DIR\lib\cmake\Qt6WebEngineWidgets"
 
       - name: Configure CMake
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
