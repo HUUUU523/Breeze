@@ -1552,8 +1552,9 @@ void BrowserWindow::onTabBarContextMenu(const QPoint &pos)
         const bool muted = view->page()->isAudioMuted();
         QAction *actMute = menu.addAction(muted ? QStringLiteral("取消静音")
                                                 : QStringLiteral("静音此标签"));
-        connect(actMute, &QAction::triggered, this, [view, muted]() {
+        connect(actMute, &QAction::triggered, this, [this, view, muted]() {
             view->page()->setAudioMuted(!muted);
+            updateTabTitle(view);   // 刷新标签文字（含静音图标）
         });
 
         const bool pinned = m_pinnedTabs.contains(view);
@@ -2842,6 +2843,8 @@ void BrowserWindow::updateTabTitle(WebView *view)
         title = title.left(24) + QStringLiteral("\u2026");
     if (m_pinnedTabs.contains(view))
         title = QStringLiteral("📌 ") + title;
+    if (view->page() && view->page()->isAudioMuted())
+        title = QStringLiteral("🔇 ") + title;
     m_tabs->setTabText(index, title);
     {
         const QString t = view->title();
