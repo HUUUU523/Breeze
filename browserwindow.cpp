@@ -481,6 +481,17 @@ void BrowserWindow::setupActions()
     addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+N")), [this]{ onNewPrivateTab(); });
     addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+T")), [this]{ onReopenClosedTab(); });
     addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+A")), [this]{ showTabSwitcher(); });
+    // Ctrl+1~8 切换标签，Ctrl+9 切到最后一个
+    for (int i = 1; i <= 8; ++i) {
+        addShortcut(QKeySequence(QStringLiteral("Ctrl+%1").arg(i)), [this, i]() {
+            if (i <= m_tabs->count())
+                m_tabs->setCurrentIndex(i - 1);
+        });
+    }
+    addShortcut(QKeySequence(QStringLiteral("Ctrl+9")), [this]() {
+        if (m_tabs->count() > 0)
+            m_tabs->setCurrentIndex(m_tabs->count() - 1);
+    });
 
     // 跟随系统时，响应系统主题变化
     connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
