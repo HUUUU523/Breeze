@@ -59,6 +59,7 @@ jobs:
         with:
           name: Breeze-installer
           path: Breeze-*-Setup.exe
+          if-no-files-found: warn
 
       - name: Upload to Release
         if: startsWith(github.ref, 'refs/tags/')
