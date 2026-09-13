@@ -67,6 +67,8 @@ qt_add_executable(Breeze WIN32
     extension.cpp
     extensiondialog.h
     extensiondialog.cpp
+    bookmarksidebar.h
+    bookmarksidebar.cpp
     cookiemanagerdialog.h
     cookiemanagerdialog.cpp
     aisidebar.h

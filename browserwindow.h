@@ -89,6 +89,7 @@ private slots:
 
     // ---- 页面 ----
     void capturePage();
+    void captureFullPage();
     void showFindBar();
     void hideFindBar();
     void findNext();
@@ -114,6 +115,9 @@ private slots:
 
     // ---- AI 侧边栏 ----
     void toggleAiSidebar();
+
+    // ---- 书签/历史侧边栏 ----
+    void toggleBookmarkSidebar();
 
     // ---- 隐私 ----
     void clearBrowsingData();
@@ -192,6 +196,7 @@ private:
     QToolBar     *m_bookmarkBar = nullptr;
     QToolBar     *m_findBar     = nullptr;
     QLineEdit    *m_findEdit    = nullptr;
+    QLabel       *m_findCountLabel = nullptr;
 
     // ---- 导航 Action ----
     QAction *m_actBack    = nullptr;
@@ -222,6 +227,7 @@ private:
     QList<Bookmark>     m_bookmarks;
     QHash<QString, QIcon> m_faviconCache;   // url -> favicon
     class AiSidebar *m_aiSidebar = nullptr;
+    class BookmarkSidebar *m_bookmarkSidebar = nullptr;
     QList<HistoryEntry> m_history;
     QList<QUrl>         m_closedTabs;   // 最近关闭的标签（栈，上限 20）
     QSet<QObject *>     m_pinnedTabs;   // 已固定的标签（存 view 指针）

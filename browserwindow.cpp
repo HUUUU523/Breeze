@@ -3,6 +3,7 @@
 #include "bookmarkmanager.h"
 #include "browserwindow.h"
 #include "aisidebar.h"
+#include "bookmarksidebar.h"
 #include "cookiemanagerdialog.h"
 #include "downloadmanager.h"
 #include "extension.h"
@@ -42,6 +43,9 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPainter>
+#include <QTimer>
+#include <QJsonObject>
 #include <QMenu>
 #include <QMessageBox>
 #include <QNetworkAccessManager>
@@ -57,6 +61,7 @@
 #include <QTextStream>
 #include <QProgressBar>
 #include <QWebEnginePage>
+#include <QWebEngineFindTextResult>
 #include <QTabBar>
 #include <QMouseEvent>
 #include <QEvent>
@@ -259,6 +264,7 @@ void BrowserWindow::setupActions()
     actPrint->setShortcut(QKeySequence::Print);
     QAction *actPdf = mainMenu->addAction(QStringLiteral("保存为 PDF…"));
     QAction *actCapture = mainMenu->addAction(QStringLiteral("截图当前页…"));
+    QAction *actCaptureFull = mainMenu->addAction(QStringLiteral("整页截图…"));
     mainMenu->addSeparator();
 
     QMenu *themeMenu = mainMenu->addMenu(QStringLiteral("主题"));
@@ -282,6 +288,7 @@ void BrowserWindow::setupActions()
     QAction *actAiChat = mainMenu->addAction(QStringLiteral("AI 对话…"));
     QAction *actAiSummary = mainMenu->addAction(QStringLiteral("AI 总结当前页"));
     QAction *actAiSidebar = mainMenu->addAction(QStringLiteral("AI 侧边栏"));
+    QAction *actBmSidebar = mainMenu->addAction(QStringLiteral("书签/历史侧边栏"));
     QAction *actPageQa = mainMenu->addAction(QStringLiteral("网页问答…"));
     mainMenu->addSeparator();
 
@@ -327,12 +334,14 @@ void BrowserWindow::setupActions()
     connect(actPrint, &QAction::triggered, this, &BrowserWindow::printPage);
     connect(actPdf, &QAction::triggered, this, &BrowserWindow::savePageAsPdf);
     connect(actCapture, &QAction::triggered, this, &BrowserWindow::capturePage);
+    connect(actCaptureFull, &QAction::triggered, this, &BrowserWindow::captureFullPage);
     connect(m_actThemeSystem, &QAction::triggered, this, [this]{ setThemeMode(QStringLiteral("system")); });
     connect(m_actThemeLight,  &QAction::triggered, this, [this]{ setThemeMode(QStringLiteral("light")); });
     connect(m_actThemeDark,   &QAction::triggered, this, [this]{ setThemeMode(QStringLiteral("dark")); });
     connect(actAiChat, &QAction::triggered, this, &BrowserWindow::showAiChat);
     connect(actAiSummary, &QAction::triggered, this, &BrowserWindow::aiSummarizePage);
     connect(actAiSidebar, &QAction::triggered, this, &BrowserWindow::toggleAiSidebar);
+    connect(actBmSidebar, &QAction::triggered, this, &BrowserWindow::toggleBookmarkSidebar);
     connect(actPageQa, &QAction::triggered, this, [this]() {
         if (!m_aiSidebar) {
             m_aiSidebar = new AiSidebar(this);
@@ -406,6 +415,9 @@ void BrowserWindow::setupActions()
     m_findEdit->setClearButtonEnabled(true);
     m_findEdit->setMinimumWidth(220);
     m_findBar->addWidget(m_findEdit);
+    m_findCountLabel = new QLabel(m_findBar);
+    m_findCountLabel->setMinimumWidth(70);
+    m_findBar->addWidget(m_findCountLabel);
     QAction *findPrevAct = m_findBar->addAction(QStringLiteral("上一个"));
     QAction *findNextAct = m_findBar->addAction(QStringLiteral("下一个"));
     QAction *findCloseAct = m_findBar->addAction(QStringLiteral("关闭"));
@@ -414,8 +426,26 @@ void BrowserWindow::setupActions()
     connect(findCloseAct, &QAction::triggered, this, &BrowserWindow::hideFindBar);
     connect(m_findEdit, &QLineEdit::returnPressed, this, &BrowserWindow::findNext);
     connect(m_findEdit, &QLineEdit::textChanged, this, [this](const QString &t){
-        if (auto *v = currentView())
-            v->findText(t, QWebEnginePage::FindFlags());
+        auto *v = currentView();
+        if (!v)
+            return;
+        if (t.isEmpty()) {
+            v->findText(QString());   // 清除高亮
+            if (m_findCountLabel)
+                m_findCountLabel->clear();
+            return;
+        }
+        v->findText(t, QWebEnginePage::FindFlags(),
+                    [this](const QWebEngineFindTextResult &result) {
+            if (!m_findCountLabel)
+                return;
+            const int n = result.numberOfMatches();
+            if (n <= 0)
+                m_findCountLabel->setText(QStringLiteral("无匹配"));
+            else
+                m_findCountLabel->setText(QStringLiteral("%1/%2")
+                    .arg(result.activeMatch()).arg(n));
+        });
     });
     m_findBar->hide();
     addToolBarBreak();
@@ -1820,6 +1850,30 @@ void BrowserWindow::toggleAiSidebar()
     }
 }
 
+void BrowserWindow::toggleBookmarkSidebar()
+{
+    if (!m_bookmarkSidebar) {
+        m_bookmarkSidebar = new BookmarkSidebar(this);
+        addDockWidget(Qt::LeftDockWidgetArea, m_bookmarkSidebar);
+        connect(m_bookmarkSidebar, &BookmarkSidebar::urlActivated, this,
+                [this](const QUrl &url) { createTab(url, true); });
+    }
+    const bool show = !m_bookmarkSidebar->isVisible();
+    m_bookmarkSidebar->setVisible(show);
+
+    if (show) {
+        QList<QPair<QString, QUrl>> bms;
+        for (const Bookmark &b : m_bookmarks)
+            bms.append({b.title, b.url});
+        m_bookmarkSidebar->setBookmarks(bms);
+
+        QList<QPair<QString, QUrl>> his;
+        for (const HistoryEntry &e : m_history)
+            his.append({e.title, e.url});
+        m_bookmarkSidebar->setHistory(his);
+    }
+}
+
 void BrowserWindow::showAiChat()
 {
     AiDialog dlg(this);
@@ -2183,6 +2237,90 @@ void BrowserWindow::capturePage()
                              QStringLiteral("无法写入图片文件。"));
 }
 
+void BrowserWindow::captureFullPage()
+{
+    auto *v = currentView();
+    if (!v)
+        return;
+
+    // 先询问保存路径
+    const QString path = QFileDialog::getSaveFileName(
+        this, QStringLiteral("保存整页截图"),
+        QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
+            + QStringLiteral("/breeze-fullpage.png"),
+        QStringLiteral("PNG 图片 (*.png)"));
+    if (path.isEmpty())
+        return;
+
+    // 注入 JS 获取页面总高与视口高
+    const QString js =
+        QStringLiteral("JSON.stringify({h: Math.max(document.body.scrollHeight,"
+                       "document.documentElement.scrollHeight),"
+                       "v: window.innerHeight})");
+
+    v->page()->runJavaScript(js, [this, v, path](const QVariant &res) {
+        const QJsonObject o = QJsonDocument::fromJson(res.toString().toUtf8()).object();
+        const int totalH = o.value(QStringLiteral("h")).toInt();
+        const int viewH  = o.value(QStringLiteral("v")).toInt();
+        if (totalH <= 0 || viewH <= 0) {
+            QMessageBox::warning(this, QStringLiteral("截图失败"),
+                                 QStringLiteral("无法获取页面尺寸。"));
+            return;
+        }
+
+        // 记录原滚动位置，完成后恢复
+        v->page()->runJavaScript(QStringLiteral("window.scrollY"),
+            [this, v, path, totalH, viewH](const QVariant &sy) {
+            const int origY = sy.toInt();
+            auto frames = std::make_shared<QList<QPair<int, QPixmap>>>();
+            auto step = std::make_shared<std::function<void(int)>>();
+
+            *step = [this, v, path, totalH, viewH, origY, frames, step](int y) {
+                if (y >= totalH) {
+                    // 全部抓完，拼接
+                    int width = 0, height = 0;
+                    for (const auto &p : *frames) {
+                        width = qMax(width, p.second.width());
+                        height += p.second.height();
+                    }
+                    if (width == 0 || height == 0) {
+                        QMessageBox::warning(this, QStringLiteral("截图失败"),
+                                             QStringLiteral("未捕获到画面。"));
+                        v->page()->runJavaScript(QStringLiteral("window.scrollTo(0,%1)").arg(origY));
+                        return;
+                    }
+                    QPixmap result(width, height);
+                    result.fill(Qt::white);
+                    QPainter painter(&result);
+                    int dy = 0;
+                    for (const auto &p : *frames) {
+                        painter.drawPixmap(0, dy, p.second);
+                        dy += p.second.height();
+                    }
+                    painter.end();
+
+                    if (result.save(path, "PNG"))
+                        statusBar()->showMessage(
+                            QStringLiteral("整页截图已保存：%1").arg(path), 3000);
+                    else
+                        QMessageBox::warning(this, QStringLiteral("保存失败"),
+                                             QStringLiteral("无法写入图片文件。"));
+                    v->page()->runJavaScript(QStringLiteral("window.scrollTo(0,%1)").arg(origY));
+                    return;
+                }
+
+                v->page()->runJavaScript(QStringLiteral("window.scrollTo(0,%1)").arg(y));
+                QTimer::singleShot(350, this, [this, v, y, frames, step]() {
+                    frames->append({y, v->grab()});
+                    (*step)(y + v->height());
+                });
+            };
+
+            (*step)(0);
+        });
+    });
+}
+
 void BrowserWindow::zoomIn()
 {
     applyZoom(0.1);
@@ -2252,6 +2390,8 @@ void BrowserWindow::hideFindBar()
 {
     if (auto *v = currentView())
         v->findText(QString());   // 清除高亮
+    if (m_findCountLabel)
+        m_findCountLabel->clear();
     m_findBar->hide();
     if (auto *v = currentView())
         v->setFocus();
