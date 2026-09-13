@@ -21,6 +21,11 @@ BookmarkManager::BookmarkManager(QWidget *parent)
 
     auto *layout = new QVBoxLayout(this);
 
+    m_filter = new QLineEdit(this);
+    m_filter->setPlaceholderText(QStringLiteral("搜索书签（名称或地址）…"));
+    m_filter->setClearButtonEnabled(true);
+    layout->addWidget(m_filter);
+
     m_tree = new QTreeWidget(this);
     m_tree->setHeaderLabels({QStringLiteral("名称"), QStringLiteral("地址")});
     m_tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
@@ -29,6 +34,8 @@ BookmarkManager::BookmarkManager(QWidget *parent)
     m_tree->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_tree->setContextMenuPolicy(Qt::CustomContextMenu);
 
+    connect(m_filter, &QLineEdit::textChanged,
+            this, &BookmarkManager::onFilterChanged);
     connect(m_tree, &QTreeWidget::itemDoubleClicked,
             this, &BookmarkManager::onItemDoubleClicked);
     connect(m_tree->model(), &QAbstractItemModel::rowsMoved,
@@ -119,6 +126,35 @@ void BookmarkManager::rebuild()
             item->setFlags(item->flags() & ~Qt::ItemIsDropEnabled);  // 书签不能接收拖放
         }
         groupItem->setExpanded(true);
+    }
+}
+
+void BookmarkManager::onFilterChanged(const QString &text)
+{
+    const QString filter = text.trimmed();
+    for (int i = 0; i < m_tree->topLevelItemCount(); ++i) {
+        QTreeWidgetItem *top = m_tree->topLevelItem(i);
+        bool anyChildVisible = false;
+        for (int c = 0; c < top->childCount(); ++c) {
+            QTreeWidgetItem *child = top->child(c);
+            const bool match = filter.isEmpty()
+                || child->text(0).contains(filter, Qt::CaseInsensitive)
+                || child->text(1).contains(filter, Qt::CaseInsensitive);
+            child->setHidden(!match);
+            if (match) anyChildVisible = true;
+        }
+        if (top->childCount() > 0) {
+            // 分组：有可见子项或（空过滤器）则显示
+            top->setHidden(!anyChildVisible && !filter.isEmpty());
+            if (!filter.isEmpty() && anyChildVisible)
+                top->setExpanded(true);
+        } else {
+            // 未分组书签（顶层叶子）
+            const bool match = filter.isEmpty()
+                || top->text(0).contains(filter, Qt::CaseInsensitive)
+                || top->text(1).contains(filter, Qt::CaseInsensitive);
+            top->setHidden(!match);
+        }
     }
 }
 

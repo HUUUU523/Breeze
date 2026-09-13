@@ -6,6 +6,7 @@
 
 class QTreeWidget;
 class QTreeWidgetItem;
+class QLineEdit;
 struct Bookmark;
 
 // 书签管理对话框：树形显示分组/书签，支持拖拽移动、增删改
@@ -23,6 +24,7 @@ signals:
     void changed();   // 书签被修改，主窗口应保存并刷新书签栏
 
 private slots:
+    void onFilterChanged(const QString &text);
     void onItemDoubleClicked(QTreeWidgetItem *item, int column);
     void onAddBookmark();
     void onAddGroup();
@@ -35,6 +37,7 @@ private:
     QStringList allGroups() const;
 
     QTreeWidget *m_tree = nullptr;
+    QLineEdit   *m_filter = nullptr;
     QList<Bookmark> *m_bookmarks = nullptr;
 };
 
