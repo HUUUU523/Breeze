@@ -2,6 +2,7 @@
 #define BROWSERWINDOW_H
 
 #include <QByteArray>
+#include <QHash>
 #include <QList>
 #include <QMainWindow>
 #include <QUrl>
@@ -11,6 +12,7 @@
 class QCloseEvent;
 class QLineEdit;
 class QCompleter;
+class QTimer;
 class QStringListModel;
 class QProgressBar;
 class QTabWidget;
@@ -61,6 +63,7 @@ private slots:
     void showTabSwitcher();                // Ctrl+Shift+A 标签搜索
     void showBlockedDetails();             // 盾牌点击：查看已拦截列表
     void togglePinTab(int index);          // 固定/取消固定标签
+    void setTabAutoRefresh(WebView *view, int seconds);  // 定时刷新（0=关闭）
 
     // ---- 导航 ----
     void onUrlEntered();
@@ -236,6 +239,7 @@ private:
     QList<HistoryEntry> m_history;
     QList<QUrl>         m_closedTabs;   // 最近关闭的标签（栈，上限 20）
     QSet<QObject *>     m_pinnedTabs;   // 已固定的标签（存 view 指针）
+    QHash<WebView *, QTimer *> m_refreshTimers;   // 标签 -> 定时刷新定时器
     QUrl                m_homeUrl{"https://www.bing.com"};
 
     // ---- 子系统 ----

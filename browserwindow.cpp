@@ -1487,6 +1487,20 @@ void BrowserWindow::onTabBarContextMenu(const QPoint &pos)
         QAction *actPin = menu.addAction(pinned ? QStringLiteral("取消固定")
                                                 : QStringLiteral("固定标签"));
         connect(actPin, &QAction::triggered, this, [this, index]() { togglePinTab(index); });
+
+        // 定时刷新
+        QMenu *refreshMenu = menu.addMenu(QStringLiteral("定时刷新"));
+        const int intervals[] = { 0, 30, 60, 300, 600 };
+        const QString labels[] = { QStringLiteral("关闭"), QStringLiteral("30 秒"),
+                                   QStringLiteral("1 分钟"), QStringLiteral("5 分钟"),
+                                   QStringLiteral("10 分钟") };
+        for (int i = 0; i < 5; ++i) {
+            QAction *a = refreshMenu->addAction(labels[i]);
+            const int sec = intervals[i];
+            connect(a, &QAction::triggered, this, [this, view, sec]() {
+                setTabAutoRefresh(view, sec);
+            });
+        }
     }
     QAction *actClose = menu.addAction(QStringLiteral("关闭标签"));
     connect(actClose, &QAction::triggered, this, [this, index]() { onCloseTab(index); });
@@ -1511,6 +1525,36 @@ void BrowserWindow::togglePinTab(int index)
         m_tabs->setTabText(index, QStringLiteral("📌 ") + title);
         statusBar()->showMessage(QStringLiteral("已固定标签"), 1500);
     }
+}
+
+void BrowserWindow::setTabAutoRefresh(WebView *view, int seconds)
+{
+    if (!view)
+        return;
+
+    // 先清掉已有的定时器
+    if (auto *old = m_refreshTimers.take(view)) {
+        old->stop();
+        old->deleteLater();
+    }
+
+    if (seconds <= 0) {
+        statusBar()->showMessage(QStringLiteral("已关闭定时刷新"), 1500);
+        return;
+    }
+
+    auto *timer = new QTimer(this);
+    timer->setInterval(seconds * 1000);
+    connect(timer, &QTimer::timeout, view, [view]() { view->reload(); });
+    // 标签销毁时清理
+    connect(view, &QObject::destroyed, this, [this, view]() {
+        if (auto *t = m_refreshTimers.take(view)) { t->stop(); t->deleteLater(); }
+    });
+    timer->start();
+    m_refreshTimers.insert(view, timer);
+
+    statusBar()->showMessage(
+        QStringLiteral("已设置定时刷新：%1 秒").arg(seconds), 2000);
 }
 
 void BrowserWindow::showTabSwitcher()
