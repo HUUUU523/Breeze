@@ -1,6 +1,9 @@
 #include "downloadmanager.h"
 
 #include <QApplication>
+#include <QSystemTrayIcon>
+#include <QTimer>
+#include <QStyle>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
@@ -372,6 +375,21 @@ void DownloadManager::onStateChanged()
     if (download->state() == QWebEngineDownloadRequest::DownloadCompleted) {
         if (auto *bar = qobject_cast<QProgressBar *>(m_table->cellWidget(row, 1)))
             bar->setValue(100);
+
+        // 系统通知：下载完成
+        if (QSystemTrayIcon::isSystemTrayAvailable()) {
+            auto *tray = new QSystemTrayIcon(this);
+            tray->setIcon(qApp->style()->standardIcon(QStyle::SP_ArrowDown));
+            tray->show();
+            tray->showMessage(QStringLiteral("下载完成"),
+                              download->downloadFileName(),
+                              QSystemTrayIcon::Information, 3000);
+            // 3 秒后清理托盘图标
+            QTimer::singleShot(4000, tray, [tray]() {
+                tray->hide();
+                tray->deleteLater();
+            });
+        }
     }
 
     // 状态变化即持久化
