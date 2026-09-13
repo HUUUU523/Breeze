@@ -8,6 +8,7 @@
 #include "syncdialog.h"
 #include "toolbox.h"
 #include "translator.h"
+#include "updatemanager.h"
 #include "userscriptmanager.h"
 #include "webview.h"
 
@@ -43,6 +44,8 @@
 #include <QProgressBar>
 #include <QWebEnginePage>
 #include <QTabBar>
+#include <QMouseEvent>
+#include <QEvent>
 #include <QTabWidget>
 #include <QToolBar>
 #include <QToolButton>
@@ -111,6 +114,20 @@ void BrowserWindow::closeEvent(QCloseEvent *event)
     QMainWindow::closeEvent(event);
 }
 
+bool BrowserWindow::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj == m_tabs->tabBar() && event->type() == QEvent::MouseButtonRelease) {
+        auto *me = static_cast<QMouseEvent *>(event);
+        if (me->button() == Qt::MiddleButton) {
+            const int idx = m_tabs->tabBar()->tabAt(me->position().toPoint());
+            if (idx >= 0)
+                onCloseTab(idx);
+            return true;
+        }
+    }
+    return QMainWindow::eventFilter(obj, event);
+}
+
 void BrowserWindow::setupUi()
 {
     m_tabs = new QTabWidget(this);
@@ -122,6 +139,9 @@ void BrowserWindow::setupUi()
 
     connect(m_tabs, &QTabWidget::currentChanged, this, &BrowserWindow::onTabChanged);
     connect(m_tabs, &QTabWidget::tabCloseRequested, this, &BrowserWindow::onCloseTab);
+
+    // 中键点击标签 → 关闭（与主流浏览器一致）
+    m_tabs->tabBar()->installEventFilter(this);
 
     m_progress = new QProgressBar(this);
     m_progress->setMaximumWidth(160);
@@ -226,6 +246,7 @@ void BrowserWindow::setupActions()
     QAction *actSync = mainMenu->addAction(QStringLiteral("云同步…"));
     mainMenu->addSeparator();
 
+    QAction *actCheckUpdate = mainMenu->addAction(QStringLiteral("检查更新…"));
     m_actSettings = mainMenu->addAction(QStringLiteral("设置…"));
     QAction *actQuit = mainMenu->addAction(QStringLiteral("退出"));
     actQuit->setShortcut(QKeySequence(QStringLiteral("Ctrl+Q")));
@@ -261,6 +282,7 @@ void BrowserWindow::setupActions()
     connect(actUs, &QAction::triggered, this, &BrowserWindow::showUserScriptManager);
     connect(actToolbox, &QAction::triggered, this, &BrowserWindow::showToolbox);
     connect(actSync, &QAction::triggered, this, &BrowserWindow::showSyncDialog);
+    connect(actCheckUpdate, &QAction::triggered, this, &BrowserWindow::checkForUpdates);
     connect(m_actSettings, &QAction::triggered, this, &BrowserWindow::showSettings);
     // ---- 阅读模式 / 标签栏 / 手势 ----
     m_actReader = mainMenu->addAction(QStringLiteral("阅读模式"));
@@ -851,13 +873,28 @@ void BrowserWindow::toggleReaderMode()
   var overlay = document.createElement('div');
   overlay.id = 'breeze-reader';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#f5f2ea;color:#222;overflow:auto;';
+  var fontSize = 19;
+  var bgIndex = 0;
+  var bgs = ['#f5f2ea', '#ffffff', '#e8f0e8', '#2b2b2b'];
+  var fgs = ['#222', '#222', '#222', '#ddd'];
   var bar = document.createElement('div');
-  bar.style.cssText = 'position:sticky;top:0;background:#f5f2ea;padding:8px 16px;text-align:right;';
-  var btn = document.createElement('button');
-  btn.textContent = '关闭阅读模式 (Esc)';
-  btn.style.cssText = 'padding:6px 14px;border:1px solid #bbb;border-radius:6px;background:#fff;cursor:pointer;';
-  btn.onclick = function(){ overlay.remove(); document.body.style.overflow=''; };
-  bar.appendChild(btn);
+  bar.style.cssText = 'position:sticky;top:0;background:inherit;padding:8px 16px;text-align:right;';
+  function mkBtn(txt, fn){
+    var b = document.createElement('button');
+    b.textContent = txt;
+    b.style.cssText = 'padding:6px 12px;margin-left:6px;border:1px solid #bbb;border-radius:6px;background:#fff;color:#333;cursor:pointer;';
+    b.onclick = fn;
+    return b;
+  }
+  bar.appendChild(mkBtn('A-', function(){ fontSize = Math.max(12, fontSize - 2); inner.style.fontSize = fontSize + 'px'; }));
+  bar.appendChild(mkBtn('A+', function(){ fontSize = Math.min(40, fontSize + 2); inner.style.fontSize = fontSize + 'px'; }));
+  bar.appendChild(mkBtn('背景', function(){
+    bgIndex = (bgIndex + 1) % bgs.length;
+    overlay.style.background = bgs[bgIndex];
+    overlay.style.color = fgs[bgIndex];
+    inner.style.color = fgs[bgIndex];
+  }));
+  bar.appendChild(mkBtn('关闭阅读模式 (Esc)', function(){ overlay.remove(); document.body.style.overflow=''; }));
   var inner = document.createElement('div');
   inner.style.cssText = 'max-width:760px;margin:0 auto;padding:20px 32px 60px;font-family:Georgia,"Microsoft YaHei",serif;font-size:19px;line-height:1.9;';
   var h = document.createElement('h1');
@@ -1082,8 +1119,15 @@ WebView *BrowserWindow::createTabView(bool privateMode)
 
     // 新窗口请求：向本窗口索取一个已加入标签栏的新 WebView，
     // Qt 会把新窗口内容加载进该视图（真正打开新标签）
-    view->setNewTabProvider([this]() -> WebView * {
-        return createTabView();
+    view->setNewTabProvider([this](bool background) -> WebView * {
+        WebView *nv = createTabView();
+        if (background) {
+            // createTabView 内已 setCurrentIndex(index)；若需后台打开，切回原标签
+            const int idx = m_tabs->indexOf(nv);
+            if (idx >= 0 && m_tabs->count() > 1)
+                m_tabs->setCurrentIndex(idx - 1 < 0 ? idx + 1 : idx - 1);
+        }
+        return nv;
     });
 
     // 右键菜单 -> AI 处理选中文字
@@ -1099,6 +1143,14 @@ WebView *BrowserWindow::createTabView(bool privateMode)
                 dlg.exec();
             });
 
+    // 右键菜单 -> 用其他搜索引擎搜索选中文字
+    connect(view, &WebView::searchRequested, this,
+            [this](const QString &engine, const QString &text) {
+                const QString tmpl = SettingsDialog::searchUrlTemplate(engine);
+                const QString query = QString::fromUtf8(QUrl::toPercentEncoding(text));
+                createTab(QUrl(tmpl.arg(query)), true);
+            });
+
     connect(view, &QWebEngineView::loadStarted, this, &BrowserWindow::onLoadStarted);
     connect(view, &QWebEngineView::loadProgress, this, &BrowserWindow::onLoadProgress);
     connect(view, &QWebEngineView::loadFinished, this, &BrowserWindow::onLoadFinished);
@@ -1109,6 +1161,16 @@ WebView *BrowserWindow::createTabView(bool privateMode)
     });
     connect(view, &QWebEngineView::urlChanged, this, [this, view](const QUrl &u) {
         updateTabUrl(view, u);
+    });
+
+    // 悬停链接：状态栏显示目标地址（仅当前标签响应）
+    connect(view, &WebView::hoverUrlChanged, this, [this, view](const QString &u) {
+        if (view != currentView())
+            return;
+        if (u.isEmpty())
+            statusBar()->clearMessage();
+        else
+            statusBar()->showMessage(u);
     });
 
     const int index = m_tabs->addTab(view,
@@ -1213,6 +1275,38 @@ QUrl BrowserWindow::normalizedUrl(const QString &text) const
 
     // 不是网址
     return QUrl();
+}
+
+void BrowserWindow::checkForUpdates()
+{
+    if (!m_updateManager)
+        m_updateManager = new UpdateManager(this);
+
+    statusBar()->showMessage(QStringLiteral("正在检查更新…"), 3000);
+
+    // 避免重复连接
+    static bool connected = false;
+    if (!connected) {
+        connected = true;
+        connect(m_updateManager, &UpdateManager::updateAvailable, this,
+                [this](const QString &version, const QString &url, const QString &notes) {
+                    const QString msg = QStringLiteral("发现新版本 %1（当前 %2）。\n\n%3\n\n是否打开发布页？")
+                        .arg(version, QStringLiteral(BREEZE_VERSION), notes.left(500));
+                    if (QMessageBox::question(this, QStringLiteral("检查更新"), msg) == QMessageBox::Yes)
+                        QDesktopServices::openUrl(QUrl(url));
+                });
+        connect(m_updateManager, &UpdateManager::upToDate, this,
+                [this](const QString &v) {
+                    QMessageBox::information(this, QStringLiteral("检查更新"),
+                        QStringLiteral("已是最新版本 %1。").arg(v));
+                });
+        connect(m_updateManager, &UpdateManager::checkFailed, this,
+                [this](const QString &err) {
+                    QMessageBox::warning(this, QStringLiteral("检查更新失败"), err);
+                });
+    }
+
+    m_updateManager->checkForUpdates();
 }
 
 void BrowserWindow::showSettings()
@@ -1476,6 +1570,14 @@ void BrowserWindow::onLoadFinished(bool ok)
     // 注入匹配的用户脚本
     if (ok && view)
         injectUserScripts(view);
+
+    // 安装悬停链接监听（状态栏显示目标地址）
+    if (view)
+        view->installHoverWatcher();
+
+    // 按域名恢复页面缩放
+    if (view)
+        applySavedZoom(view);
 }
 
 void BrowserWindow::navBack()
@@ -1599,8 +1701,10 @@ void BrowserWindow::zoomOut()
 
 void BrowserWindow::zoomReset()
 {
-    if (auto *v = currentView())
+    if (auto *v = currentView()) {
         v->setZoomFactor(1.0);
+        saveZoomForView(v);
+    }
 }
 
 void BrowserWindow::applyZoom(double delta)
@@ -1611,8 +1715,35 @@ void BrowserWindow::applyZoom(double delta)
     double f = v->zoomFactor() + delta;
     f = qBound(0.25, f, 5.0);
     v->setZoomFactor(f);
+    saveZoomForView(v);
     statusBar()->showMessage(
         QStringLiteral("缩放：%1%").arg(qRound(f * 100)), 1500);
+}
+
+// 记录某标签当前页面的缩放比例（按域名）。隐私标签不持久化。
+void BrowserWindow::saveZoomForView(WebView *view)
+{
+    if (!view || view->property("breezePrivate").toBool())
+        return;
+    const QString host = view->url().host();
+    if (host.isEmpty())
+        return;
+    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    s.setValue(QStringLiteral("zoom/") + host, view->zoomFactor());
+}
+
+// 按域名恢复缩放比例（页面加载完成后调用）。隐私标签不恢复。
+void BrowserWindow::applySavedZoom(WebView *view)
+{
+    if (!view || view->property("breezePrivate").toBool())
+        return;
+    const QString host = view->url().host();
+    if (host.isEmpty())
+        return;
+    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    const double f = s.value(QStringLiteral("zoom/") + host, 1.0).toDouble();
+    if (f > 0.0 && !qFuzzyCompare(f, 1.0))
+        view->setZoomFactor(qBound(0.25, f, 5.0));
 }
 
 

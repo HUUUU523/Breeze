@@ -46,6 +46,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
 private slots:
     // ---- 标签页 ----
@@ -101,6 +102,9 @@ private slots:
     // ---- 云同步 ----
     void showSyncDialog();
 
+    // ---- 更新 ----
+    void checkForUpdates();
+
     // ---- 扩展 / 工具 ----
     void showUserScriptManager();
     void showToolbox();
@@ -154,6 +158,8 @@ private:
 
     // ---- 缩放 / 主题辅助 ----
     void applyZoom(double delta);
+    void saveZoomForView(WebView *view);
+    void applySavedZoom(WebView *view);
     QString themeMode() const;
     QWebEngineProfile *privateProfile();   // 隐私 Profile，惰性创建
 
@@ -197,6 +203,7 @@ private:
 
     // ---- 子系统 ----
     DownloadManager   *m_downloadManager = nullptr;
+    class UpdateManager *m_updateManager = nullptr;
     AdBlocker         *m_adBlocker       = nullptr;
     HistoryDialog     *m_historyDialog   = nullptr;
     QWebEngineProfile *m_privateProfile  = nullptr;

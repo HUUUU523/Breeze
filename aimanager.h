@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QJsonArray>
 
 class QNetworkAccessManager;
@@ -34,11 +35,16 @@ public:
     // 取消当前流式请求
     void cancelStream();
 
+    // 拉取可用模型列表（OpenAI /models 或 Ollama /api/tags）
+    void fetchModels();
+
 signals:
     void finished(const QString &content);         // 非流式：完整结果
     void streamChunk(const QString &delta);        // 流式：增量片段
     void streamFinished(const QString &fullText);  // 流式：完成
     void failed(const QString &error);
+    void modelsFetched(const QStringList &models);
+    void modelsFetchFailed(const QString &error);
 
 private:
     void sendRequest(const QJsonArray &messages, bool stream);

@@ -53,6 +53,64 @@ void AiManager::setModel(const QString &model)
     s.setValue(QStringLiteral("ai/model"), model.trimmed());
 }
 
+void AiManager::fetchModels()
+{
+    QString ep = endpoint().trimmed();
+    if (ep.isEmpty()) { emit modelsFetchFailed(QStringLiteral("未配置接口地址")); return; }
+
+    // 去掉尾部 /chat/completions，得到 base
+    if (ep.endsWith(QStringLiteral("/chat/completions")))
+        ep.chop(int(qstrlen("/chat/completions")));
+    while (ep.endsWith(QLatin1Char('/')))
+        ep.chop(1);
+
+    // 若 base 不含 /v1，且看起来是 Ollama（含 11434），用 /api/tags；否则用 /v1/models
+    QString modelsUrl;
+    if (!ep.contains(QStringLiteral("/v1")) && ep.contains(QStringLiteral("11434")))
+        modelsUrl = ep + QStringLiteral("/api/tags");
+    else
+        modelsUrl = ep + QStringLiteral("/v1/models");
+
+    QNetworkRequest req{QUrl(modelsUrl)};
+    const QString key = apiKey();
+    if (!key.isEmpty())
+        req.setRawHeader("Authorization", QByteArray("Bearer ") + key.toUtf8());
+
+    QNetworkReply *reply = m_net->get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit modelsFetchFailed(reply->errorString());
+            return;
+        }
+        const QJsonObject o = QJsonDocument::fromJson(reply->readAll()).object();
+        QStringList models;
+
+        // OpenAI 风格：{ "data": [ { "id": "..." }, ... ] }
+        const QJsonArray data = o.value(QStringLiteral("data")).toArray();
+        for (const QJsonValue &v : data) {
+            const QString id = v.toObject().value(QStringLiteral("id")).toString();
+            if (!id.isEmpty()) models << id;
+        }
+
+        // Ollama 风格：{ "models": [ { "name": "..." }, ... ] }
+        const QJsonArray arr = o.value(QStringLiteral("models")).toArray();
+        for (const QJsonValue &v : arr) {
+            const QJsonObject mo = v.toObject();
+            QString name = mo.value(QStringLiteral("name")).toString();
+            if (name.isEmpty()) name = mo.value(QStringLiteral("model")).toString();
+            if (!name.isEmpty()) models << name;
+        }
+
+        models.removeDuplicates();
+        if (models.isEmpty()) {
+            emit modelsFetchFailed(QStringLiteral("未解析到模型列表（返回格式不匹配）"));
+            return;
+        }
+        emit modelsFetched(models);
+    });
+}
+
 void AiManager::chat(const QJsonArray &messages)
 {
     sendRequest(messages, false);

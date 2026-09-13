@@ -55,6 +55,10 @@ qt_add_executable(Breeze WIN32
     aimanager.cpp
     aidialog.h
     aidialog.cpp
+    updatemanager.h
+    updatemanager.cpp
+    logger.h
+    logger.cpp
 )
 
 target_link_libraries(Breeze PRIVATE

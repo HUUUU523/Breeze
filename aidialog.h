@@ -3,9 +3,11 @@
 
 #include <QDialog>
 #include <QJsonArray>
+#include <QStringList>
 
 class QTextEdit;
 class QLineEdit;
+class QComboBox;
 class QPushButton;
 class AiManager;
 
@@ -26,6 +28,9 @@ private slots:
     void onFailed(const QString &error);
     void onStreamChunk(const QString &delta);
     void onStreamFinished(const QString &full);
+    void onFetchModels();
+    void onModelsFetched(const QStringList &models);
+    void onModelsFetchFailed(const QString &error);
 
 private:
     void redraw();                // 按 m_messages + 流式内容完整重绘
@@ -37,7 +42,7 @@ private:
     QPushButton *m_sendBtn = nullptr;
     QLineEdit   *m_endpointEdit = nullptr;
     QLineEdit   *m_keyEdit = nullptr;
-    QLineEdit   *m_modelEdit = nullptr;
+    QComboBox   *m_modelCombo = nullptr;
     QJsonArray   m_messages;
     bool         m_busy = false;
     QString      m_streamingText;   // 当前流式回答累积

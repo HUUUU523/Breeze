@@ -1,6 +1,7 @@
 #include "aidialog.h"
 #include "aimanager.h"
 
+#include <QComboBox>
 #include <QFormLayout>
 #include <QJsonObject>
 #include <QGroupBox>
@@ -54,10 +55,16 @@ AiDialog::AiDialog(QWidget *parent)
     m_endpointEdit = new QLineEdit(cfg);
     m_keyEdit = new QLineEdit(cfg);
     m_keyEdit->setEchoMode(QLineEdit::Password);
-    m_modelEdit = new QLineEdit(cfg);
+    m_modelCombo = new QComboBox(cfg);
+    m_modelCombo->setEditable(true);
+    auto *refreshModelsBtn = new QPushButton(QStringLiteral("刷新"), cfg);
+    auto *modelRow = new QHBoxLayout;
+    modelRow->addWidget(m_modelCombo, 1);
+    modelRow->addWidget(refreshModelsBtn);
     form->addRow(QStringLiteral("接口地址："), m_endpointEdit);
     form->addRow(QStringLiteral("API Key："), m_keyEdit);
-    form->addRow(QStringLiteral("模型："), m_modelEdit);
+    form->addRow(QStringLiteral("模型："), modelRow);
+    connect(refreshModelsBtn, &QPushButton::clicked, this, &AiDialog::onFetchModels);
     layout->addWidget(cfg);
 
     refreshSettingsBar();
@@ -73,18 +80,21 @@ AiDialog::AiDialog(QWidget *parent)
     auto saveCfg = [this]() {
         AiManager::setEndpoint(m_endpointEdit->text());
         AiManager::setApiKey(m_keyEdit->text());
-        AiManager::setModel(m_modelEdit->text());
+        AiManager::setModel(m_modelCombo->currentText());
     };
     connect(m_endpointEdit, &QLineEdit::editingFinished, this, saveCfg);
     connect(m_keyEdit,      &QLineEdit::editingFinished, this, saveCfg);
-    connect(m_modelEdit,    &QLineEdit::editingFinished, this, saveCfg);
+    connect(m_modelCombo->lineEdit(), &QLineEdit::editingFinished, this, saveCfg);
+
+    connect(m_ai, &AiManager::modelsFetched,     this, &AiDialog::onModelsFetched);
+    connect(m_ai, &AiManager::modelsFetchFailed, this, &AiDialog::onModelsFetchFailed);
 }
 
 void AiDialog::refreshSettingsBar()
 {
     m_endpointEdit->setText(AiManager::endpoint());
     m_keyEdit->setText(AiManager::apiKey());
-    m_modelEdit->setText(AiManager::model());
+    m_modelCombo->setCurrentText(AiManager::model());
 }
 
 void AiDialog::askWithPrompt(const QString &prompt)
@@ -124,7 +134,7 @@ void AiDialog::onSend()
     // 保存配置
     AiManager::setEndpoint(m_endpointEdit->text());
     AiManager::setApiKey(m_keyEdit->text());
-    AiManager::setModel(m_modelEdit->text());
+    AiManager::setModel(m_modelCombo->currentText());
 
     QJsonObject userMsg;
     userMsg.insert(QStringLiteral("role"), QStringLiteral("user"));
@@ -181,6 +191,27 @@ void AiDialog::onFinished(const QString &content)
     m_busy = false;
     m_sendBtn->setEnabled(true);
     m_sendBtn->setText(QStringLiteral("发送"));
+}
+
+void AiDialog::onFetchModels()
+{
+    AiManager::setEndpoint(m_endpointEdit->text());
+    AiManager::setApiKey(m_keyEdit->text());
+    m_ai->fetchModels();
+}
+
+void AiDialog::onModelsFetched(const QStringList &models)
+{
+    const QString cur = m_modelCombo->currentText();
+    m_modelCombo->clear();
+    m_modelCombo->addItems(models);
+    if (!cur.isEmpty())
+        m_modelCombo->setCurrentText(cur);
+}
+
+void AiDialog::onModelsFetchFailed(const QString &error)
+{
+    QMessageBox::warning(this, QStringLiteral("获取模型失败"), error);
 }
 
 void AiDialog::onFailed(const QString &error)
