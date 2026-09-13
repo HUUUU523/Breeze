@@ -7,6 +7,7 @@
 #include "downloadmanager.h"
 #include "historymanager.h"
 #include "settingsdialog.h"
+#include "syncmerge.h"
 #include "syncdialog.h"
 #include "toolbox.h"
 #include "translator.h"
@@ -1664,57 +1665,7 @@ void BrowserWindow::showSettings()
 
 QByteArray BrowserWindow::mergeSyncData(const QByteArray &local, const QByteArray &remote)
 {
-    const QJsonObject lo = QJsonDocument::fromJson(local).object();
-    const QJsonObject ro = QJsonDocument::fromJson(remote).object();
-
-    QJsonObject out;
-
-    // ---- 书签：按 URL 去重取并集，标题以本地优先 ----
-    QJsonArray bmOut;
-    QSet<QString> seen;
-    auto addBookmarks = [&](const QJsonObject &src) {
-        for (const QJsonValue &v : src.value(QStringLiteral("bookmarks")).toArray()) {
-            const QJsonObject o = v.toObject();
-            const QString url = o.value(QStringLiteral("url")).toString();
-            if (url.isEmpty() || seen.contains(url))
-                continue;
-            seen.insert(url);
-            bmOut.append(o);
-        }
-    };
-    addBookmarks(lo);   // 本地优先
-    addBookmarks(ro);   // 云端补充
-    out.insert(QStringLiteral("bookmarks"), bmOut);
-
-    // ---- 历史：按 URL 去重，保留较新的时间 ----
-    QHash<QString, QJsonObject> hisMap;
-    auto addHistory = [&](const QJsonObject &src) {
-        for (const QJsonValue &v : src.value(QStringLiteral("history")).toArray()) {
-            const QJsonObject o = v.toObject();
-            const QString url = o.value(QStringLiteral("url")).toString();
-            if (url.isEmpty())
-                continue;
-            if (!hisMap.contains(url)) {
-                hisMap.insert(url, o);
-            } else {
-                // 取较新时间
-                const QDateTime a = QDateTime::fromString(
-                    hisMap[url].value(QStringLiteral("time")).toString(), Qt::ISODate);
-                const QDateTime b = QDateTime::fromString(
-                    o.value(QStringLiteral("time")).toString(), Qt::ISODate);
-                if (b > a)
-                    hisMap[url] = o;
-            }
-        }
-    };
-    addHistory(lo);
-    addHistory(ro);
-    QJsonArray hisOut;
-    for (const QJsonObject &o : hisMap)
-        hisOut.append(o);
-    out.insert(QStringLiteral("history"), hisOut);
-
-    return QJsonDocument(out).toJson(QJsonDocument::Compact);
+    return SyncMerge::merge(local, remote);
 }
 
 QByteArray BrowserWindow::exportSyncData() const

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.19)
 
-project(Breeze VERSION 2.0.0 LANGUAGES CXX)
+project(Breeze VERSION 2.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -59,6 +59,8 @@ qt_add_executable(Breeze WIN32
     updatemanager.cpp
     logger.h
     logger.cpp
+    syncmerge.h
+    syncmerge.cpp
     cookiemanagerdialog.h
     cookiemanagerdialog.cpp
     aisidebar.h
@@ -73,3 +75,10 @@ target_link_libraries(Breeze PRIVATE
     Qt6::PrintSupport
     Qt6::Network
 )
+
+# ---- 测试 ----
+option(BREEZE_BUILD_TESTS "Build unit tests" ON)
+if(BREEZE_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
