@@ -5,6 +5,8 @@
 #include "aisidebar.h"
 #include "cookiemanagerdialog.h"
 #include "downloadmanager.h"
+#include "extension.h"
+#include "extensiondialog.h"
 #include "historymanager.h"
 #include "settingsdialog.h"
 #include "syncmerge.h"
@@ -289,6 +291,7 @@ void BrowserWindow::setupActions()
     connect(actAdBlock, &QAction::toggled, this, &BrowserWindow::toggleAdBlock);
 
     QAction *actUs = mainMenu->addAction(QStringLiteral("用户脚本…"));
+    QAction *actExt = mainMenu->addAction(QStringLiteral("扩展管理…"));
     QAction *actToolbox = mainMenu->addAction(QStringLiteral("工具箱…"));
     QAction *actSync = mainMenu->addAction(QStringLiteral("云同步…"));
     mainMenu->addSeparator();
@@ -345,6 +348,10 @@ void BrowserWindow::setupActions()
         }
     });
     connect(actUs, &QAction::triggered, this, &BrowserWindow::showUserScriptManager);
+    connect(actExt, &QAction::triggered, this, [this]() {
+        ExtensionDialog dlg(this);
+        dlg.exec();
+    });
     connect(actToolbox, &QAction::triggered, this, &BrowserWindow::showToolbox);
     connect(actSync, &QAction::triggered, this, &BrowserWindow::showSyncDialog);
     connect(actCheckUpdate, &QAction::triggered, this, &BrowserWindow::checkForUpdates);
@@ -1368,8 +1375,9 @@ WebView *BrowserWindow::createTab(const QUrl &url, bool switchToTab)
         m_tabs->setCurrentIndex(index - 1 < 0 ? index + 1 : index - 1);
 
     if (url.isValid() && !url.isEmpty()) {
-        // 先注册 document-start 脚本，再导航
+        // 先注册 document-start 脚本与扩展 content scripts，再导航
         injectStartScripts(view, url);
+        injectExtensionScripts(view, url);
         view->setUrl(url);
     }
 
@@ -1898,6 +1906,60 @@ void BrowserWindow::injectStartScripts(WebView *view, const QUrl &url)
         qs.setWorldId(QWebEngineScript::MainWorld);
         qs.setRunsOnSubFrames(false);
         collection.insert(qs);
+    }
+}
+
+void BrowserWindow::injectExtensionScripts(WebView *view, const QUrl &url)
+{
+    if (!view || !view->page())
+        return;
+
+    const QList<Extension> exts = ExtensionManager::loadAll();
+    QWebEngineScriptCollection &collection = view->page()->scripts();
+
+    for (const Extension &ext : exts) {
+        for (const ContentScript &cs : ext.contentScripts) {
+            if (!ExtensionManager::matchesUrl(cs, url))
+                continue;
+
+            // 拼接 JS 内容
+            QString code;
+            for (const QString &rel : cs.js) {
+                QFile f(ext.dir + QLatin1Char('/') + rel);
+                if (f.open(QIODevice::ReadOnly))
+                    code += QString::fromUtf8(f.readAll()) + QLatin1Char('\n');
+            }
+            // CSS 包成 <style> 注入
+            for (const QString &rel : cs.css) {
+                QFile f(ext.dir + QLatin1Char('/') + rel);
+                if (f.open(QIODevice::ReadOnly)) {
+                    const QString css = QString::fromUtf8(f.readAll());
+                    const QString cssJson = QString::fromUtf8(
+                        QJsonDocument(QJsonArray{ css }).toJson(QJsonDocument::Compact));
+                    const QString cssLiteral = cssJson.mid(1, cssJson.length() - 2);
+                    code += QStringLiteral(
+                        "(function(){var st=document.createElement('style');"
+                        "st.textContent=%1;document.head.appendChild(st);})();\n")
+                        .arg(cssLiteral);
+                }
+            }
+
+            if (code.trimmed().isEmpty())
+                continue;
+
+            QWebEngineScript qs;
+            qs.setName(QStringLiteral("breeze-ext-%1").arg(ext.name));
+            qs.setSourceCode(code);
+            if (cs.runAt == QStringLiteral("document_start"))
+                qs.setInjectionPoint(QWebEngineScript::DocumentCreation);
+            else if (cs.runAt == QStringLiteral("document_end"))
+                qs.setInjectionPoint(QWebEngineScript::DocumentReady);
+            else
+                qs.setInjectionPoint(QWebEngineScript::Deferred);
+            qs.setWorldId(QWebEngineScript::MainWorld);
+            qs.setRunsOnSubFrames(false);
+            collection.insert(qs);
+        }
     }
 }
 

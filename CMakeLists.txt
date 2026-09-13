@@ -61,6 +61,10 @@ qt_add_executable(Breeze WIN32
     logger.cpp
     syncmerge.h
     syncmerge.cpp
+    extension.h
+    extension.cpp
+    extensiondialog.h
+    extensiondialog.cpp
     cookiemanagerdialog.h
     cookiemanagerdialog.cpp
     aisidebar.h

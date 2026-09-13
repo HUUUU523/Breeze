@@ -126,6 +126,7 @@ private slots:
     void showToolbox();
     void injectUserScripts(WebView *view);
     void injectStartScripts(WebView *view, const QUrl &url);   // @run-at document-start
+    void injectExtensionScripts(WebView *view, const QUrl &url); // 扩展 content scripts
     void showAiChat();
     void aiSummarizePage();
     // ---- 广告拦截 ----
