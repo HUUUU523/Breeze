@@ -643,22 +643,27 @@ void BrowserWindow::addBookmarkAction(const Bookmark &b, QToolBar *bar)
 
     connect(act, &QAction::triggered, this, [this, url]{ openBookmark(url); });
 
-    QWidget *w = bar->widgetForAction(act);
-    auto *btn = qobject_cast<QToolButton *>(w);
-    if (btn) {
-        btn->setContextMenuPolicy(Qt::CustomContextMenu);
-        connect(btn, &QToolButton::customContextMenuRequested, this,
-                [this, url, btn](const QPoint &pos) {
-                    QMenu menu;
-                    QAction *edit = menu.addAction(QStringLiteral("编辑书签…"));
-                    QAction *del = menu.addAction(QStringLiteral("删除书签"));
-                    QAction *chosen = menu.exec(btn->mapToGlobal(pos));
-                    if (chosen == edit)
-                        editBookmark(url);
-                    else if (chosen == del)
-                        removeBookmark(url);
-                });
-    }
+    // 用自定义按钮替换默认工具按钮，以支持中键后台打开
+    auto *btn = new BookmarkButton(url, bar);
+    btn->setDefaultAction(act);
+    btn->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    bar->removeAction(act);
+    bar->addWidget(btn);
+
+    btn->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(btn, &QToolButton::customContextMenuRequested, this,
+            [this, url, btn](const QPoint &pos) {
+                QMenu menu;
+                QAction *edit = menu.addAction(QStringLiteral("编辑书签…"));
+                QAction *del = menu.addAction(QStringLiteral("删除书签"));
+                QAction *chosen = menu.exec(btn->mapToGlobal(pos));
+                if (chosen == edit)
+                    editBookmark(url);
+                else if (chosen == del)
+                    removeBookmark(url);
+            });
+    connect(btn, &BookmarkButton::middleClicked, this,
+            [this](const QUrl &u) { createTab(u, false); });   // 后台打开
 }
 
 void BrowserWindow::addBookmarkForCurrentPage()

@@ -3,6 +3,8 @@
 
 #include <QByteArray>
 #include <QHash>
+#include <QToolButton>
+#include <QMouseEvent>
 #include <QList>
 #include <QMainWindow>
 #include <QUrl>
@@ -31,6 +33,29 @@ struct Bookmark {
     QString title;
     QUrl    url;
     QString group;   // 空表示未分组
+};
+
+// 书签按钮：区分左键（当前标签打开）和中键（后台打开）
+class BookmarkButton : public QToolButton
+{
+    Q_OBJECT
+public:
+    explicit BookmarkButton(const QUrl &url, QWidget *parent = nullptr)
+        : QToolButton(parent), m_url(url) {}
+    QUrl url() const { return m_url; }
+signals:
+    void middleClicked(const QUrl &url);
+protected:
+    void mouseReleaseEvent(QMouseEvent *e) override {
+        if (e->button() == Qt::MiddleButton) {
+            emit middleClicked(m_url);
+            e->accept();
+            return;
+        }
+        QToolButton::mouseReleaseEvent(e);
+    }
+private:
+    QUrl m_url;
 };
 
 class BrowserWindow : public QMainWindow
