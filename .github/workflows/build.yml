@@ -42,8 +42,16 @@ jobs:
       - name: Decode signing certificate
         shell: pwsh
         run: |
-          $bytes = [Convert]::FromBase64String("${{ secrets.CODE_SIGN_PFX_BASE64 }}")
+          $b64 = "${{ secrets.CODE_SIGN_PFX_BASE64 }}" -replace '\s',''
+          if ([string]::IsNullOrWhiteSpace($b64)) { throw "CODE_SIGN_PFX_BASE64 secret is empty" }
+          $bytes = [Convert]::FromBase64String($b64)
           [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\cert.pfx", $bytes)
+
+      - name: Verify secrets present
+        shell: pwsh
+        run: |
+          Write-Host "PFX base64 length: $("${{ secrets.CODE_SIGN_PFX_BASE64 }}".Length)"
+          Write-Host "Password length: $("${{ secrets.CODE_SIGN_PFX_PASSWORD }}".Length)"
 
       - name: Locate signtool
         shell: pwsh
@@ -104,3 +112,4 @@ jobs:
           files: |
             Breeze-win64.zip
             Breeze-*-Setup.exe
+
