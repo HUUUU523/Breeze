@@ -35,6 +35,10 @@ public:
     // 应用当前代理到 QNetworkProxy（启动时调用）
     static void    applyProxy();
 
+    // 下载限速（KB/s，0 = 不限速）
+    static int     downloadSpeedLimit();
+    static void    setDownloadSpeedLimit(int kbPerSec);
+
     // 搜索引擎名 -> 查询 URL 模板（含 %1 占位）
     static QString searchUrlTemplate(const QString &engineName);
 
@@ -50,6 +54,7 @@ private:
     QComboBox *m_proxyTypeCombo = nullptr;
     QLineEdit *m_proxyHostEdit  = nullptr;
     QSpinBox  *m_proxyPortSpin  = nullptr;
+    QSpinBox  *m_speedLimitSpin = nullptr;
     QLineEdit *m_proxyUserEdit  = nullptr;
     QLineEdit *m_proxyPassEdit  = nullptr;
 };

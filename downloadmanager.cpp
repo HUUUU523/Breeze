@@ -1,6 +1,8 @@
 #include "downloadmanager.h"
 
 #include <QApplication>
+#include <QSettings>
+#include <QThread>
 #include <QSystemTrayIcon>
 #include <QTimer>
 #include <QStyle>
@@ -130,8 +132,20 @@ void DownloadManager::startResumableDownload(const QUrl &url, const QString &sav
         return;
     }
 
-    connect(reply, &QNetworkReply::readyRead, this, [reply, out]() {
-        out->write(reply->readAll());
+    // 限速：KB/s，0 = 不限速
+    const int limitKB = QSettings(QStringLiteral("Breeze"), QStringLiteral("Breeze"))
+                            .value(QStringLiteral("download/speedLimitKB"), 0).toInt();
+
+    connect(reply, &QNetworkReply::readyRead, this, [reply, out, limitKB]() {
+        const QByteArray data = reply->readAll();
+        out->write(data);
+        out->flush();
+        if (limitKB > 0 && !data.isEmpty()) {
+            // 按本次数据量对应的时长节流（毫秒）
+            const int ms = (data.size() * 1000) / (limitKB * 1024);
+            if (ms > 0)
+                QThread::msleep(static_cast<unsigned long>(qMin(ms, 1000)));
+        }
     });
 
     connect(reply, &QNetworkReply::downloadProgress, this,

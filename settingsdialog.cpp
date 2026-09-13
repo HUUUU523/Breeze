@@ -60,6 +60,17 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     proxyForm->addRow(QStringLiteral("用户名："), m_proxyUserEdit);
     proxyForm->addRow(QStringLiteral("密码："), m_proxyPassEdit);
     layout->addWidget(proxyBox);
+
+    // ---- 下载限速 ----
+    auto *dlBox = new QGroupBox(QStringLiteral("下载"), this);
+    auto *dlForm = new QFormLayout(dlBox);
+    m_speedLimitSpin = new QSpinBox(dlBox);
+    m_speedLimitSpin->setRange(0, 102400);
+    m_speedLimitSpin->setSuffix(QStringLiteral(" KB/s"));
+    m_speedLimitSpin->setSpecialValueText(QStringLiteral("不限速"));
+    dlForm->addRow(QStringLiteral("限速："), m_speedLimitSpin);
+    layout->addWidget(dlBox);
+
     layout->addWidget(new QLabel(QStringLiteral("提示：主页与搜索引擎修改后立即生效。"), this));
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
@@ -84,6 +95,7 @@ void SettingsDialog::load()
     m_proxyPortSpin->setValue(proxyPort());
     m_proxyUserEdit->setText(proxyUser());
     m_proxyPassEdit->setText(proxyPassword());
+    m_speedLimitSpin->setValue(downloadSpeedLimit());
 }
 
 void SettingsDialog::onAccepted()
@@ -91,6 +103,7 @@ void SettingsDialog::onAccepted()
     setHomePage(m_homeEdit->text().trimmed());
     setSearchEngine(m_engineCombo->currentText());
     setRecordHistory(m_historyCheck->isChecked());
+    setDownloadSpeedLimit(m_speedLimitSpin->value());
     setProxy(m_proxyTypeCombo->currentData().toString(),
              m_proxyHostEdit->text().trimmed(),
              m_proxyPortSpin->value(),
@@ -189,6 +202,18 @@ void SettingsDialog::setProxy(const QString &type, const QString &host, int port
     s.setValue(QStringLiteral("proxy/port"), port);
     s.setValue(QStringLiteral("proxy/user"), user);
     s.setValue(QStringLiteral("proxy/password"), password);
+}
+
+int SettingsDialog::downloadSpeedLimit()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("download/speedLimitKB"), 0).toInt();
+}
+
+void SettingsDialog::setDownloadSpeedLimit(int kbPerSec)
+{
+    QSettings s(kOrg, kApp);
+    s.setValue(QStringLiteral("download/speedLimitKB"), qMax(0, kbPerSec));
 }
 
 void SettingsDialog::applyProxy()
