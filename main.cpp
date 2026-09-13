@@ -4,6 +4,7 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QIcon>
 #include <QStandardPaths>
 #include <QWebEngineProfile>
 
@@ -14,6 +15,7 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("Breeze"));
     QApplication::setApplicationVersion(QStringLiteral(BREEZE_VERSION));
     QApplication::setOrganizationName(QStringLiteral("Breeze"));
+    QApplication::setWindowIcon(QIcon(QStringLiteral(":/B.ico")));
 
     // 安装文件日志（AppData/logs/breeze.log）
     Logger::install();

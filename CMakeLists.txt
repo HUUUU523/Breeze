@@ -24,6 +24,8 @@ add_compile_definitions(
 )
 
 qt_add_executable(Breeze WIN32
+    app.rc
+    resources.qrc
     main.cpp
     browserwindow.h
     browserwindow.cpp
