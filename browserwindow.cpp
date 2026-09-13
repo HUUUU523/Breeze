@@ -433,6 +433,8 @@ void BrowserWindow::setupActions()
     m_findCountLabel = new QLabel(m_findBar);
     m_findCountLabel->setMinimumWidth(70);
     m_findBar->addWidget(m_findCountLabel);
+    m_findCaseCheck = new QCheckBox(QStringLiteral("区分大小写"), m_findBar);
+    m_findBar->addWidget(m_findCaseCheck);
     QAction *findPrevAct = m_findBar->addAction(QStringLiteral("上一个"));
     QAction *findNextAct = m_findBar->addAction(QStringLiteral("下一个"));
     QAction *findCloseAct = m_findBar->addAction(QStringLiteral("关闭"));
@@ -450,7 +452,10 @@ void BrowserWindow::setupActions()
                 m_findCountLabel->clear();
             return;
         }
-        v->findText(t, QWebEnginePage::FindFlags(),
+        QWebEnginePage::FindFlags flags;
+        if (m_findCaseCheck && m_findCaseCheck->isChecked())
+            flags |= QWebEnginePage::FindCaseSensitively;
+        v->findText(t, flags,
                     [this](const QWebEngineFindTextResult &result) {
             if (!m_findCountLabel)
                 return;
@@ -461,6 +466,14 @@ void BrowserWindow::setupActions()
                 m_findCountLabel->setText(QStringLiteral("%1/%2")
                     .arg(result.activeMatch()).arg(n));
         });
+    });
+    connect(m_findCaseCheck, &QCheckBox::toggled, this, [this](bool) {
+        // 重新触发一次查找
+        const QString t = m_findEdit->text();
+        if (auto *v = currentView())
+            v->findText(t, m_findCaseCheck->isChecked()
+                            ? QWebEnginePage::FindCaseSensitively
+                            : QWebEnginePage::FindFlags());
     });
     m_findBar->hide();
     addToolBarBreak();

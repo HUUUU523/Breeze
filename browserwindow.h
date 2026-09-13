@@ -22,6 +22,7 @@ class QToolBar;
 class QAction;
 class QMenu;
 class QLabel;
+class QCheckBox;
 class QWebEngineProfile;
 class WebView;
 class AdBlocker;
@@ -233,6 +234,7 @@ private:
     QToolBar     *m_findBar     = nullptr;
     QLineEdit    *m_findEdit    = nullptr;
     QLabel       *m_findCountLabel = nullptr;
+    QCheckBox    *m_findCaseCheck  = nullptr;
 
     // ---- 导航 Action ----
     QAction *m_actBack    = nullptr;
