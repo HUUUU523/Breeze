@@ -262,6 +262,21 @@ void BrowserWindow::setupActions()
     connect(actToolbox, &QAction::triggered, this, &BrowserWindow::showToolbox);
     connect(actSync, &QAction::triggered, this, &BrowserWindow::showSyncDialog);
     connect(m_actSettings, &QAction::triggered, this, &BrowserWindow::showSettings);
+    // ---- 阅读模式 / 标签栏 / 手势 ----
+    m_actReader = mainMenu->addAction(QStringLiteral("阅读模式"));
+    QAction *actTabTop   = mainMenu->addAction(QStringLiteral("标签栏：顶部"));
+    QAction *actTabLeft  = mainMenu->addAction(QStringLiteral("标签栏：左侧"));
+    QAction *actTabRight = mainMenu->addAction(QStringLiteral("标签栏：右侧"));
+    m_actGestures = mainMenu->addAction(QStringLiteral("鼠标手势"));
+    m_actGestures->setCheckable(true);
+    mainMenu->addSeparator();
+
+    connect(m_actReader, &QAction::triggered, this, &BrowserWindow::toggleReaderMode);
+    connect(actTabTop,   &QAction::triggered, this, [this]{ setTabPosition(0); });
+    connect(actTabLeft,  &QAction::triggered, this, [this]{ setTabPosition(1); });
+    connect(actTabRight, &QAction::triggered, this, [this]{ setTabPosition(2); });
+    connect(m_actGestures, &QAction::toggled, this, &BrowserWindow::setMouseGesturesEnabled);
+
     connect(actQuit, &QAction::triggered, this, &QWidget::close);
 
     // ---- 快捷键 ----
@@ -809,6 +824,121 @@ void BrowserWindow::importHistory()
         m_historyDialog->setEntries(m_history);
     QMessageBox::information(this, QStringLiteral("导入完成"),
         QStringLiteral("新增 %1 条历史记录。").arg(added));
+}
+
+
+
+// ===================== 阅读模式 =====================
+
+void BrowserWindow::toggleReaderMode()
+{
+    WebView *v = currentView();
+    if (!v)
+        return;
+
+    const QString js = QStringLiteral(R"JS(
+(function() {
+  var old = document.getElementById('breeze-reader');
+  if (old) { old.remove(); document.body.style.overflow=''; return 'off'; }
+  var best = null, bestLen = 0;
+  document.querySelectorAll('article, main, [role=main], .article, .post, .content, #content').forEach(function(el){
+    var n = (el.innerText||'').length;
+    if (n > bestLen) { bestLen = n; best = el; }
+  });
+  if (!best || bestLen < 200) { best = document.body; bestLen = (best.innerText||'').length; }
+  if (bestLen < 200) return 'no-content';
+  var text = best.innerText || '';
+  var overlay = document.createElement('div');
+  overlay.id = 'breeze-reader';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#f5f2ea;color:#222;overflow:auto;';
+  var bar = document.createElement('div');
+  bar.style.cssText = 'position:sticky;top:0;background:#f5f2ea;padding:8px 16px;text-align:right;';
+  var btn = document.createElement('button');
+  btn.textContent = '关闭阅读模式 (Esc)';
+  btn.style.cssText = 'padding:6px 14px;border:1px solid #bbb;border-radius:6px;background:#fff;cursor:pointer;';
+  btn.onclick = function(){ overlay.remove(); document.body.style.overflow=''; };
+  bar.appendChild(btn);
+  var inner = document.createElement('div');
+  inner.style.cssText = 'max-width:760px;margin:0 auto;padding:20px 32px 60px;font-family:Georgia,"Microsoft YaHei",serif;font-size:19px;line-height:1.9;';
+  var h = document.createElement('h1');
+  h.textContent = document.title || '';
+  h.style.cssText = 'font-size:28px;line-height:1.4;margin:0 0 24px;';
+  var body = document.createElement('div');
+  body.textContent = text;
+  body.style.cssText = 'white-space:pre-wrap;word-wrap:break-word;';
+  inner.appendChild(h); inner.appendChild(body);
+  overlay.appendChild(bar); overlay.appendChild(inner);
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+  document.addEventListener('keydown', function esc(e){
+    if (e.key === 'Escape') { overlay.remove(); document.body.style.overflow=''; document.removeEventListener('keydown', esc); }
+  });
+  return 'on';
+})();
+)JS");
+
+    v->page()->runJavaScript(js, [this](const QVariant &r) {
+        const QString s = r.toString();
+        if (s == QLatin1String("on"))
+            statusBar()->showMessage(QStringLiteral("已进入阅读模式（Esc 退出）"), 3000);
+        else if (s == QLatin1String("off"))
+            statusBar()->showMessage(QStringLiteral("已退出阅读模式"), 2000);
+        else
+            statusBar()->showMessage(QStringLiteral("当前页面没有可提取的正文"), 3000);
+    });
+}
+
+// ===================== 标签栏位置 =====================
+
+void BrowserWindow::setTabPosition(int pos)
+{
+    QTabWidget::TabPosition p = QTabWidget::North;
+    if (pos == 1) p = QTabWidget::West;
+    else if (pos == 2) p = QTabWidget::East;
+    m_tabs->setTabPosition(p);
+
+    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    s.setValue(QStringLiteral("ui/tabPosition"), pos);
+    statusBar()->showMessage(
+        pos == 0 ? QStringLiteral("标签栏：顶部")
+        : pos == 1 ? QStringLiteral("标签栏：左侧")
+                   : QStringLiteral("标签栏：右侧"), 2000);
+}
+
+// ===================== 鼠标手势 =====================
+
+void BrowserWindow::setMouseGesturesEnabled(bool enabled)
+{
+    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    s.setValue(QStringLiteral("ui/mouseGestures"), enabled);
+
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto *v = qobject_cast<WebView *>(m_tabs->widget(i));
+        if (!v)
+            continue;
+        const QString js = enabled
+            ? QStringLiteral(R"JS(
+(function(){
+  if (window.__breezeGestures) return;
+  window.__breezeGestures = true;
+  var sx=0, sy=0, tracking=false;
+  document.addEventListener('mousedown', function(e){ if(e.button===2){ tracking=true; sx=e.clientX; sy=e.clientY; } }, true);
+  document.addEventListener('mouseup', function(e){
+    if (e.button!==2 || !tracking) return;
+    tracking=false;
+    var dx=e.clientX-sx, dy=e.clientY-sy, ax=Math.abs(dx), ay=Math.abs(dy);
+    if (Math.max(ax,ay) < 60) return;
+    if (ax > ay) { if (dx < 0) history.back(); else history.forward(); }
+    else if (dy < 0) location.reload();
+  }, true);
+})();
+)JS")
+            : QStringLiteral("window.__breezeGestures = false;");
+        v->page()->runJavaScript(js);
+    }
+    statusBar()->showMessage(
+        enabled ? QStringLiteral("鼠标手势已启用（右键左滑后退/右滑前进/上滑刷新）")
+                : QStringLiteral("鼠标手势已关闭"), 3000);
 }
 
 void BrowserWindow::exportHistory()

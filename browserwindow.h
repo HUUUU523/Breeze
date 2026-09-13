@@ -118,6 +118,10 @@ private slots:
     void importHistory();
     void exportHistory();
 
+    // 阅读模式 / 标签栏位置 / 鼠标手势
+    void toggleReaderMode();
+    void setTabPosition(int pos);   // 0=顶部 1=左 2=右
+    void setMouseGesturesEnabled(bool enabled);
 
 private:
     // ---- 初始化 ----
@@ -176,6 +180,10 @@ private:
     QAction *m_actDownloads       = nullptr;
     QAction *m_actHistory         = nullptr;
     QAction *m_actSettings        = nullptr;
+
+    // ---- 阅读模式 / 标签栏 / 手势 ----
+    QAction *m_actReader          = nullptr;
+    QAction *m_actGestures        = nullptr;
 
     // ---- 主题 Action ----
     QAction *m_actThemeSystem = nullptr;
