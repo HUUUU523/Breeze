@@ -79,9 +79,42 @@ DownloadManager::DownloadManager(QWidget *parent)
 
     layout->addWidget(m_table);
 
+    auto *clearBtn = new QPushButton(QStringLiteral("清空已完成记录"), this);
     auto *closeBtn = new QPushButton(QStringLiteral("关闭"), this);
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::hide);
+    connect(clearBtn, &QPushButton::clicked, this, [this]() {
+        if (QMessageBox::question(this, QStringLiteral("清空记录"),
+                QStringLiteral("清空已完成/已取消的下载记录？（不影响已下载的文件）"))
+            != QMessageBox::Yes)
+            return;
+        for (int i = m_records.size() - 1; i >= 0; --i) {
+            const QString st = m_records.at(i).status;
+            if (st == QStringLiteral("已完成") || st == QStringLiteral("已取消")
+                || st == QStringLiteral("已中断"))
+                m_records.removeAt(i);
+        }
+        saveRecords();
+        // 重载表格显示
+        m_table->setRowCount(0);
+        for (const DownloadRecord &r : m_records) {
+            const int row = m_table->rowCount();
+            m_table->insertRow(row);
+            m_table->setItem(row, 0, new QTableWidgetItem(r.fileName));
+            auto *bar = new QProgressBar(m_table);
+            bar->setRange(0, 100);
+            bar->setValue(100);
+            m_table->setCellWidget(row, 1, bar);
+            m_table->setItem(row, 2, new QTableWidgetItem(r.status));
+            auto *btn = new QPushButton(QStringLiteral("文件夹"), m_table);
+            const QString dir = r.directory;
+            connect(btn, &QPushButton::clicked, this, [dir]() {
+                QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
+            });
+            m_table->setCellWidget(row, 3, btn);
+        }
+    });
     auto *bottom = new QHBoxLayout;
+    bottom->addWidget(clearBtn);
     bottom->addStretch();
     bottom->addWidget(closeBtn);
     layout->addLayout(bottom);
