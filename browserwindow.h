@@ -103,6 +103,7 @@ private slots:
     void zoomReset();
     void printPage();
     void savePageAsPdf();
+    void savePageAsHtml();      // 保存为 MHTML
 
     // ---- 会话 / 设置 / 主题 ----
     void saveSession() const;

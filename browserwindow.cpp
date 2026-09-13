@@ -266,6 +266,7 @@ void BrowserWindow::setupActions()
     QAction *actPrint = mainMenu->addAction(QStringLiteral("打印…"));
     actPrint->setShortcut(QKeySequence::Print);
     QAction *actPdf = mainMenu->addAction(QStringLiteral("保存为 PDF…"));
+    QAction *actSaveHtml = mainMenu->addAction(QStringLiteral("保存为 MHTML…"));
     QAction *actCapture = mainMenu->addAction(QStringLiteral("截图当前页…"));
     QAction *actCaptureFull = mainMenu->addAction(QStringLiteral("整页截图…"));
     mainMenu->addSeparator();
@@ -339,6 +340,7 @@ void BrowserWindow::setupActions()
     connect(actFind, &QAction::triggered, this, &BrowserWindow::showFindBar);
     connect(actPrint, &QAction::triggered, this, &BrowserWindow::printPage);
     connect(actPdf, &QAction::triggered, this, &BrowserWindow::savePageAsPdf);
+    connect(actSaveHtml, &QAction::triggered, this, &BrowserWindow::savePageAsHtml);
     connect(actCapture, &QAction::triggered, this, &BrowserWindow::capturePage);
     connect(actCaptureFull, &QAction::triggered, this, &BrowserWindow::captureFullPage);
     connect(m_actThemeSystem, &QAction::triggered, this, [this]{ setThemeMode(QStringLiteral("system")); });
@@ -2518,6 +2520,26 @@ void BrowserWindow::savePageAsPdf()
 
     v->page()->printToPdf(path);
     statusBar()->showMessage(QStringLiteral("已导出 PDF：%1").arg(path), 3000);
+}
+
+void BrowserWindow::savePageAsHtml()
+{
+    auto *v = currentView();
+    if (!v)
+        return;
+
+    const QString name = v->title().isEmpty() ? QStringLiteral("page") : v->title();
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    const QString path = QFileDialog::getSaveFileName(
+        this, QStringLiteral("保存为 MHTML"),
+        dir + QLatin1Char('/') + name + QStringLiteral(".mhtml"),
+        QStringLiteral("MHTML 文件 (*.mhtml)"));
+    if (path.isEmpty())
+        return;
+
+    const QString filePath = path;
+    v->page()->save(filePath, QWebEngineDownloadRequest::MimeHtmlSaveFormat);
+    statusBar()->showMessage(QStringLiteral("正在保存：%1").arg(filePath), 3000);
 }
 
 
