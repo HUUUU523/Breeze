@@ -38,6 +38,31 @@ jobs:
       - name: Deploy Qt dependencies
         run: windeployqt --release --no-translations build\Breeze.exe
 
+      # ---- 代码签名准备 ----
+      - name: Decode signing certificate
+        shell: pwsh
+        run: |
+          $bytes = [Convert]::FromBase64String("${{ secrets.CODE_SIGN_PFX_BASE64 }}")
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\cert.pfx", $bytes)
+
+      - name: Locate signtool
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe not found" }
+          echo "SIGNTOOL=$($signtool.FullName)" >> $env:GITHUB_ENV
+
+      # ---- 签名主程序 ----
+      - name: Sign Breeze.exe
+        shell: pwsh
+        run: |
+          & $env:SIGNTOOL sign /f "$env:RUNNER_TEMP\cert.pfx" /p "${{ secrets.CODE_SIGN_PFX_PASSWORD }}" `
+            /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
+            "build\Breeze.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Signing Breeze.exe failed" }
+
       - name: Package (zip)
         run: Compress-Archive -Path build\* -DestinationPath Breeze-win64.zip -Force
 
@@ -47,6 +72,17 @@ jobs:
       - name: Build installer
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      # ---- 签名安装包 ----
+      - name: Sign installer
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Filter "Breeze-*-Setup.exe" | Select-Object -First 1
+          if (-not $setup) { throw "Installer not found" }
+          & $env:SIGNTOOL sign /f "$env:RUNNER_TEMP\cert.pfx" /p "${{ secrets.CODE_SIGN_PFX_PASSWORD }}" `
+            /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
+            $setup.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Signing installer failed" }
 
       - name: Upload zip artifact
         uses: actions/upload-artifact@v4
