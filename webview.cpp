@@ -263,6 +263,12 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
             menu.addAction(QStringLiteral("复制页面地址"), this, [this]() {
                 QApplication::clipboard()->setText(url().toString());
             });
+            menu.addAction(QStringLiteral("复制标题和地址"), this, [this]() {
+                const QString t = title();
+                QApplication::clipboard()->setText(
+                    t.isEmpty() ? url().toString()
+                                : t + QStringLiteral("\n") + url().toString());
+            });
             menu.addAction(QStringLiteral("查看源代码"), this, [this]() {
                 setUrl(QUrl(QStringLiteral("view-source:") + url().toString()));
             });
