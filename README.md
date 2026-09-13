@@ -24,6 +24,19 @@
 - **广告拦截**：内置常见广告/追踪域名黑名单 + URL 关键字规则，可开关
 - **右键增强**：网页右键可复制链接、AI 处理选中文字（解释/翻译/改写）
 - **导入导出**：书签（Chrome/Edge HTML 格式）、历史（JSON）
+- **阅读模式**：提取正文、字号/背景切换（Esc 退出）
+- **页面截图**：可视区域截图保存为 PNG
+- **标签增强**：固定标签、单标签静音、Ctrl+Shift+T 恢复关闭
+- **地址栏补全**：历史 + 书签智能提示
+- **代理设置**：HTTP / SOCKS5 全局代理（重启生效）
+- **盾牌计数**：地址栏显示当前站点拦截数，点击查看详情
+- **划词工具栏**：选中文字浮出「解释 / 翻译 / 搜索」
+- **HTTPS 升级**：http 主框架请求强制升级；证书错误可继续访问
+- **Cookie 管理**：列出 / 删除 Cookie
+- **一键清除**：历史 / 缓存 / Cookie / 下载记录
+- **AI 侧边栏**：常驻停靠面板，可带入当前页正文问答
+- **自动更新**：检查 GitHub Release 新版本
+- **扩展系统**（最小）：加载含 manifest.json 的扩展目录，注入 content scripts
 
 ## 截图
 
@@ -75,6 +88,8 @@ build\Breeze.exe
 | `history.json` | 历史记录 |
 | `downloads.json` | 下载记录 |
 | `userscripts.json` | 用户脚本 |
+| `extensions.json` | 已加载的扩展目录列表 |
+| `logs/breeze.log` | 运行日志 |
 
 ## 项目结构
 
@@ -94,7 +109,16 @@ Breeze/
 ├── toolbox.*             工具箱
 ├── qrcodegen.*           二维码生成（内置）
 ├── aimanager.*           AI 接口（OpenAI 兼容）
-└── aidialog.*            AI 对话窗口
+├── aidialog.*            AI 对话窗口
+├── aisidebar.*           AI 侧边栏
+├── adblocker.*           广告拦截（含盾牌计数、HTTPS 升级）
+├── cookiemanagerdialog.* Cookie 管理
+├── updatemanager.*       GitHub 自动更新检查
+├── logger.*              文件日志
+├── syncmerge.*           同步数据合并（纯逻辑）
+├── extension.*           扩展系统（manifest 解析）
+├── extensiondialog.*     扩展管理
+└── tests/                单元测试（Qt Test + CTest）
 ```
 
 ## 快捷键
@@ -112,6 +136,8 @@ Breeze/
 | Ctrl+= / - / 0 | 缩放 |
 | Ctrl+P | 打印 |
 | Ctrl+Shift+P | 保存为 PDF |
+| Ctrl+Shift+T | 恢复关闭的标签 |
+| Ctrl+点击 / 中键点击链接 | 后台打开 |
 
 ## AI 配置
 
