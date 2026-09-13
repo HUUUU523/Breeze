@@ -81,6 +81,7 @@ private slots:
     void showBookmarkManager();
     void openBookmark(const QUrl &url);
     void removeBookmark(const QUrl &url);
+    void editBookmark(const QUrl &url);
     void rebuildBookmarkBar();
     void addBookmarkAction(const Bookmark &b, QToolBar *bar);
 

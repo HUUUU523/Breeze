@@ -650,8 +650,12 @@ void BrowserWindow::addBookmarkAction(const Bookmark &b, QToolBar *bar)
         connect(btn, &QToolButton::customContextMenuRequested, this,
                 [this, url, btn](const QPoint &pos) {
                     QMenu menu;
+                    QAction *edit = menu.addAction(QStringLiteral("编辑书签…"));
                     QAction *del = menu.addAction(QStringLiteral("删除书签"));
-                    if (menu.exec(btn->mapToGlobal(pos)) == del)
+                    QAction *chosen = menu.exec(btn->mapToGlobal(pos));
+                    if (chosen == edit)
+                        editBookmark(url);
+                    else if (chosen == del)
                         removeBookmark(url);
                 });
     }
@@ -821,6 +825,42 @@ void BrowserWindow::removeBookmark(const QUrl &url)
     }
     saveBookmarks();
     rebuildBookmarkBar();
+}
+
+void BrowserWindow::editBookmark(const QUrl &url)
+{
+    int idx = -1;
+    for (int i = 0; i < m_bookmarks.size(); ++i) {
+        if (m_bookmarks.at(i).url == url) { idx = i; break; }
+    }
+    if (idx < 0)
+        return;
+
+    bool ok = false;
+    const QString newTitle = QInputDialog::getText(
+        this, QStringLiteral("编辑书签"), QStringLiteral("标题："),
+        QLineEdit::Normal, m_bookmarks.at(idx).title, &ok);
+    if (!ok)
+        return;
+
+    // 收集已有分组供选择
+    QStringList groups;
+    for (const Bookmark &b : m_bookmarks)
+        if (!b.group.isEmpty() && !groups.contains(b.group))
+            groups << b.group;
+    groups.prepend(QString());   // 空 = 未分组
+
+    const QString newGroup = QInputDialog::getItem(
+        this, QStringLiteral("编辑书签"), QStringLiteral("分组："),
+        groups, groups.indexOf(m_bookmarks.at(idx).group), true, &ok);
+    if (!ok)
+        return;
+
+    m_bookmarks[idx].title = newTitle;
+    m_bookmarks[idx].group = newGroup;
+    saveBookmarks();
+    rebuildBookmarkBar();
+    statusBar()->showMessage(QStringLiteral("书签已更新"), 2000);
 }
 
 // ===================== 下载 =====================
