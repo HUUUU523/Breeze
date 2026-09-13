@@ -59,6 +59,24 @@ DownloadManager::DownloadManager(QWidget *parent)
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->verticalHeader()->setVisible(false);
 
+    // 双击已完成的下载 → 用系统默认程序打开
+    connect(m_table, &QTableWidget::itemDoubleClicked, this,
+            [this](QTableWidgetItem *item) {
+                if (!item)
+                    return;
+                const int row = item->row();
+                auto *statusItem = m_table->item(row, 2);
+                if (!statusItem || statusItem->text() != QStringLiteral("已完成"))
+                    return;
+                auto *pathItem = m_table->item(row, 3);
+                if (!pathItem)
+                    return;
+                const QString path = pathItem->text();
+                if (!QFile::exists(path))
+                    return;
+                QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+            });
+
     layout->addWidget(m_table);
 
     auto *closeBtn = new QPushButton(QStringLiteral("关闭"), this);
