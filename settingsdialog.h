@@ -43,6 +43,10 @@ public:
     static int     startupBehavior();
     static void    setStartupBehavior(int mode);
 
+    // 新标签页：0=快速拨号，1=主页，2=空白页
+    static int     newTabBehavior();
+    static void    setNewTabBehavior(int mode);
+
     // 搜索引擎名 -> 查询 URL 模板（含 %1 占位）
     static QString searchUrlTemplate(const QString &engineName);
 
@@ -60,6 +64,7 @@ private:
     QSpinBox  *m_proxyPortSpin  = nullptr;
     QSpinBox  *m_speedLimitSpin = nullptr;
     QComboBox *m_startupCombo   = nullptr;
+    QComboBox *m_newTabCombo    = nullptr;
     QLineEdit *m_proxyUserEdit  = nullptr;
     QLineEdit *m_proxyPassEdit  = nullptr;
 };

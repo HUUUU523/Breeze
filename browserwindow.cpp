@@ -1510,9 +1510,16 @@ WebView *BrowserWindow::createTab(const QUrl &url, bool switchToTab)
 
 void BrowserWindow::onNewTab()
 {
-    WebView *view = createTab(QUrl(), true);
-    if (view)
-        view->setHtml(dialsHtml());
+    const int mode = SettingsDialog::newTabBehavior();
+    if (mode == 1) {
+        createTab(homeUrl(), true);
+    } else if (mode == 2) {
+        createTab(QUrl(QStringLiteral("about:blank")), true);
+    } else {
+        WebView *view = createTab(QUrl(), true);
+        if (view)
+            view->setHtml(dialsHtml());
+    }
     m_urlBar->setFocus();
     m_urlBar->selectAll();
 }

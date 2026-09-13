@@ -43,6 +43,12 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_startupCombo->addItem(QStringLiteral("打开主页"), 1);
     form->addRow(QStringLiteral("启动时："), m_startupCombo);
 
+    m_newTabCombo = new QComboBox(this);
+    m_newTabCombo->addItem(QStringLiteral("快速拨号"), 0);
+    m_newTabCombo->addItem(QStringLiteral("主页"), 1);
+    m_newTabCombo->addItem(QStringLiteral("空白页"), 2);
+    form->addRow(QStringLiteral("新标签页："), m_newTabCombo);
+
     layout->addLayout(form);
 
     // ---- 代理 ----
@@ -93,6 +99,7 @@ void SettingsDialog::load()
     m_engineCombo->setCurrentText(searchEngine());
     m_historyCheck->setChecked(recordHistory());
     m_startupCombo->setCurrentIndex(startupBehavior() == 1 ? 1 : 0);
+    m_newTabCombo->setCurrentIndex(qBound(0, newTabBehavior(), 2));
 
     const QString pt = proxyType();
     const int idx = m_proxyTypeCombo->findData(pt);
@@ -110,6 +117,7 @@ void SettingsDialog::onAccepted()
     setSearchEngine(m_engineCombo->currentText());
     setRecordHistory(m_historyCheck->isChecked());
     setStartupBehavior(m_startupCombo->currentData().toInt());
+    setNewTabBehavior(m_newTabCombo->currentData().toInt());
     setDownloadSpeedLimit(m_speedLimitSpin->value());
     setProxy(m_proxyTypeCombo->currentData().toString(),
              m_proxyHostEdit->text().trimmed(),
@@ -233,6 +241,18 @@ void SettingsDialog::setStartupBehavior(int mode)
 {
     QSettings s(kOrg, kApp);
     s.setValue(QStringLiteral("startup/behavior"), mode);
+}
+
+int SettingsDialog::newTabBehavior()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("newtab/behavior"), 0).toInt();
+}
+
+void SettingsDialog::setNewTabBehavior(int mode)
+{
+    QSettings s(kOrg, kApp);
+    s.setValue(QStringLiteral("newtab/behavior"), mode);
 }
 
 void SettingsDialog::applyProxy()
