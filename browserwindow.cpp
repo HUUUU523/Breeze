@@ -1228,6 +1228,7 @@ void BrowserWindow::setMouseGesturesEnabled(bool enabled)
     if (Math.max(ax,ay) < 60) return;
     if (ax > ay) { if (dx < 0) history.back(); else history.forward(); }
     else if (dy < 0) location.reload();
+    else window.scrollTo({top:0, behavior:'smooth'});   // 下滑：回到顶部
   }, true);
 })();
 )JS")
@@ -1235,7 +1236,7 @@ void BrowserWindow::setMouseGesturesEnabled(bool enabled)
         v->page()->runJavaScript(js);
     }
     statusBar()->showMessage(
-        enabled ? QStringLiteral("鼠标手势已启用（右键左滑后退/右滑前进/上滑刷新）")
+        enabled ? QStringLiteral("鼠标手势已启用（左滑后退 / 右滑前进 / 上滑刷新 / 下滑回顶）")
                 : QStringLiteral("鼠标手势已关闭"), 3000);
 }
 
