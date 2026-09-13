@@ -979,6 +979,14 @@ void BrowserWindow::setupHistory()
         m_history.clear();
         saveHistory();
     });
+    connect(m_historyDialog, &HistoryDialog::entryRemoved, this,
+            [this](const QUrl &url) {
+                for (int i = m_history.size() - 1; i >= 0; --i) {
+                    if (m_history.at(i).url == url)
+                        m_history.removeAt(i);
+                }
+                saveHistory();
+            });
 
     loadHistory();
     m_historyDialog->setEntries(m_history);

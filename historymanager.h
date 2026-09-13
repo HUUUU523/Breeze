@@ -30,11 +30,13 @@ public:
 signals:
     void openUrlRequested(const QUrl &url);
     void cleared();
+    void entryRemoved(const QUrl &url);   // 删除单条
 
 private slots:
     void onFilterChanged(const QString &text);
     void onItemActivated();
     void onClearClicked();
+    void onDeleteSelected();
 
 private:
     void rebuild();

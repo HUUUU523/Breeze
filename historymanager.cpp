@@ -33,8 +33,10 @@ HistoryDialog::HistoryDialog(QWidget *parent)
     layout->addWidget(m_list);
 
     auto *bottom = new QHBoxLayout;
+    auto *delBtn = new QPushButton(QStringLiteral("删除选中"), this);
     auto *clearBtn = new QPushButton(QStringLiteral("清空历史"), this);
     auto *closeBtn = new QPushButton(QStringLiteral("关闭"), this);
+    bottom->addWidget(delBtn);
     bottom->addWidget(clearBtn);
     bottom->addStretch();
     bottom->addWidget(closeBtn);
@@ -42,6 +44,7 @@ HistoryDialog::HistoryDialog(QWidget *parent)
 
     connect(m_filter, &QLineEdit::textChanged, this, &HistoryDialog::onFilterChanged);
     connect(m_list, &QListWidget::itemActivated, this, &HistoryDialog::onItemActivated);
+    connect(delBtn, &QPushButton::clicked, this, &HistoryDialog::onDeleteSelected);
     connect(clearBtn, &QPushButton::clicked, this, &HistoryDialog::onClearClicked);
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::hide);
 }
@@ -123,6 +126,25 @@ void HistoryDialog::onItemActivated()
     const QUrl url(stored);
     if (url.isValid())
         emit openUrlRequested(url);
+}
+
+void HistoryDialog::onDeleteSelected()
+{
+    auto *item = m_list->currentItem();
+    if (!item)
+        return;
+    const QString stored = item->data(Qt::UserRole).toString();
+    if (stored.isEmpty())
+        return;   // 分组标题
+    const QUrl url(stored);
+
+    // 从 m_entries 删除所有匹配该 URL 的条目
+    for (int i = m_entries.size() - 1; i >= 0; --i) {
+        if (m_entries.at(i).url == url)
+            m_entries.removeAt(i);
+    }
+    rebuild();
+    emit entryRemoved(url);
 }
 
 void HistoryDialog::onClearClicked()
