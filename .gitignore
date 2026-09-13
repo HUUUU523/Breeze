@@ -22,6 +22,15 @@ cmake_install.cmake
 gh_login.txt
 *.log
 
+# 证书（切勿提交）
+*.pfx
+*.p12
+*.pvk
+*.cer
+*.crt
+*.key
+cert.pfx
+
 # 安装程序产物
 *.exe
 Breeze-*-Setup.exe
