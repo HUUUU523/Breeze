@@ -25,3 +25,12 @@ gh_login.txt
 # 安装程序产物
 *.exe
 Breeze-*-Setup.exe
+
+# 调试临时文件
+iscc_out.txt
+job*.txt
+log*.txt
+diag*.txt
+j*.json
+runid.txt
+jobid.txt
