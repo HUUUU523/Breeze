@@ -84,6 +84,10 @@ Breeze/
 - **双向同步合并**（上传前先下载云端，按 URL 合并书签/历史，冲突取较新记录）
 - **用户脚本（UserScript / UserStyle）**（JS 或 CSS，URL 通配匹配，页面加载后自动注入）
 - **多语言**（中文 / English，工具栏 🌐 菜单切换，代码内字典）
+- **广告拦截**（adblocker.h/.cpp，内置域名黑名单 + URL 关键字规则，菜单可开关）
+- **右键菜单增强**（复制链接/媒体地址、AI 解释/翻译/改写选中文字）
+- **书签导入导出**（Chrome/Edge Netscape HTML 格式）
+- **历史导入导出**（JSON 格式）
 - **AI 助手**（OpenAI 兼容接口，菜单「AI 对话…」「AI 总结当前页」）：
   - 支持 OpenAI / DeepSeek / 通义千问 / Kimi / Ollama 等所有 `/v1/chat/completions` 服务
   - 多轮对话窗口，接口地址/API Key/模型名可配置（存 QSettings）

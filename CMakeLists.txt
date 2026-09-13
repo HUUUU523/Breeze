@@ -29,6 +29,8 @@ qt_add_executable(Breeze WIN32
     browserwindow.cpp
     webview.h
     webview.cpp
+    adblocker.h
+    adblocker.cpp
     downloadmanager.h
     downloadmanager.cpp
     historymanager.h

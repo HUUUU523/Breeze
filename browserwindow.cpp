@@ -1,3 +1,4 @@
+#include "adblocker.h"
 #include "aidialog.h"
 #include "bookmarkmanager.h"
 #include "browserwindow.h"
@@ -34,9 +35,11 @@
 #include <QLabel>
 #include <QHash>
 #include <QSet>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QStyle>
+#include <QTextStream>
 #include <QProgressBar>
 #include <QWebEnginePage>
 #include <QTabBar>
@@ -54,6 +57,8 @@ BrowserWindow::BrowserWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     migrateLegacyData();
+
+    m_adBlocker = new AdBlocker(this);
 
     setupUi();
     setupActions();
@@ -170,11 +175,15 @@ void BrowserWindow::setupActions()
     m_actBookmark = mainMenu->addAction(QStringLiteral("添加书签"));
     m_actBookmark->setShortcut(QKeySequence(QStringLiteral("Ctrl+D")));
     m_actManageBookmarks = mainMenu->addAction(QStringLiteral("管理书签…"));
+    QAction *actImportBm = mainMenu->addAction(QStringLiteral("导入书签（HTML）…"));
+    QAction *actExportBm = mainMenu->addAction(QStringLiteral("导出书签（HTML）…"));
     m_actShowBookmarkBar = mainMenu->addAction(QStringLiteral("显示书签栏"));
     m_actShowBookmarkBar->setCheckable(true);
     m_actShowBookmarkBar->setChecked(false);
 
     m_actHistory   = mainMenu->addAction(QStringLiteral("历史记录…"));
+    QAction *actImportHis = mainMenu->addAction(QStringLiteral("导入历史（JSON）…"));
+    QAction *actExportHis = mainMenu->addAction(QStringLiteral("导出历史（JSON）…"));
     m_actDownloads = mainMenu->addAction(QStringLiteral("下载…"));
     mainMenu->addSeparator();
 
@@ -207,6 +216,11 @@ void BrowserWindow::setupActions()
     QAction *actAiSummary = mainMenu->addAction(QStringLiteral("AI 总结当前页"));
     mainMenu->addSeparator();
 
+    QAction *actAdBlock = mainMenu->addAction(QStringLiteral("拦截广告"));
+    actAdBlock->setCheckable(true);
+    actAdBlock->setChecked(m_adBlocker->isEnabled());
+    connect(actAdBlock, &QAction::toggled, this, &BrowserWindow::toggleAdBlock);
+
     QAction *actUs = mainMenu->addAction(QStringLiteral("用户脚本…"));
     QAction *actToolbox = mainMenu->addAction(QStringLiteral("工具箱…"));
     QAction *actSync = mainMenu->addAction(QStringLiteral("云同步…"));
@@ -227,10 +241,14 @@ void BrowserWindow::setupActions()
     connect(m_actNewPrivateTab, &QAction::triggered, this, &BrowserWindow::onNewPrivateTab);
     connect(m_actBookmark, &QAction::triggered, this, &BrowserWindow::addBookmarkForCurrentPage);
     connect(m_actManageBookmarks, &QAction::triggered, this, &BrowserWindow::showBookmarkManager);
+    connect(actImportBm, &QAction::triggered, this, &BrowserWindow::importBookmarks);
+    connect(actExportBm, &QAction::triggered, this, &BrowserWindow::exportBookmarks);
     connect(m_actShowBookmarkBar, &QAction::toggled, this, [this](bool on){
         if (m_bookmarkBar) m_bookmarkBar->setVisible(on);
     });
     connect(m_actHistory, &QAction::triggered, this, &BrowserWindow::showHistory);
+    connect(actImportHis, &QAction::triggered, this, &BrowserWindow::importHistory);
+    connect(actExportHis, &QAction::triggered, this, &BrowserWindow::exportHistory);
     connect(m_actDownloads, &QAction::triggered, this, &BrowserWindow::showDownloads);
     connect(actFind, &QAction::triggered, this, &BrowserWindow::showFindBar);
     connect(actPrint, &QAction::triggered, this, &BrowserWindow::printPage);
@@ -500,6 +518,97 @@ void BrowserWindow::showBookmarkManager()
     dlg.exec();
 }
 
+void BrowserWindow::importBookmarks()
+{
+    const QString path = QFileDialog::getOpenFileName(
+        this, QStringLiteral("导入书签"),
+        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+        QStringLiteral("HTML 书签 (*.html *.htm);;所有文件 (*.*)"));
+    if (path.isEmpty())
+        return;
+
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this, QStringLiteral("导入失败"),
+                             QStringLiteral("无法打开文件。"));
+        return;
+    }
+    const QString html = QString::fromUtf8(f.readAll());
+    f.close();
+
+    // 解析 Netscape Bookmark 格式的 <A HREF="...">title</A>
+    QRegularExpression re(
+        QStringLiteral("<a\\s+href=\"([^\"]+)\"[^>]*>(.*?)</a>"),
+        QRegularExpression::CaseInsensitiveOption | QRegularExpression::DotMatchesEverythingOption);
+    auto it = re.globalMatch(html);
+
+    int added = 0;
+    while (it.hasNext()) {
+        const auto m = it.next();
+        const QString href = m.captured(1).trimmed();
+        QString title = m.captured(2).trimmed();
+        title.remove(QRegularExpression(QStringLiteral("<[^>]+>")));  // 去标签
+        if (href.isEmpty() || href.startsWith(QLatin1String("javascript:")))
+            continue;
+        const QUrl url(href);
+        if (!url.isValid())
+            continue;
+        // 去重
+        bool exists = false;
+        for (const Bookmark &b : m_bookmarks) {
+            if (b.url == url) { exists = true; break; }
+        }
+        if (exists)
+            continue;
+        Bookmark nb;
+        nb.title = title.isEmpty() ? url.host() : title;
+        nb.url = url;
+        m_bookmarks.append(nb);
+        ++added;
+    }
+
+    saveBookmarks();
+    rebuildBookmarkBar();
+    QMessageBox::information(this, QStringLiteral("导入完成"),
+        QStringLiteral("新增 %1 个书签。").arg(added));
+}
+
+void BrowserWindow::exportBookmarks()
+{
+    const QString path = QFileDialog::getSaveFileName(
+        this, QStringLiteral("导出书签"),
+        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+            + QStringLiteral("/breeze-bookmarks.html"),
+        QStringLiteral("HTML 书签 (*.html)"));
+    if (path.isEmpty())
+        return;
+
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, QStringLiteral("导出失败"),
+                             QStringLiteral("无法写入文件。"));
+        return;
+    }
+    QTextStream ts(&f);
+    ts.setEncoding(QStringConverter::Utf8);
+    ts << "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n"
+       << "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=UTF-8\">\n"
+       << "<TITLE>Bookmarks</TITLE>\n"
+       << "<H1>Bookmarks</H1>\n"
+       << "<DL><p>\n";
+    for (const Bookmark &b : m_bookmarks) {
+        const QString title = b.title.isEmpty() ? b.url.host() : b.title;
+        ts << "    <DT><A HREF=\"" << b.url.toString().toHtmlEscaped() << "\">"
+           << title.toHtmlEscaped() << "</A>\n";
+    }
+    ts << "</DL><p>\n";
+    f.close();
+
+    QMessageBox::information(this, QStringLiteral("导出完成"),
+        QStringLiteral("已导出 %1 个书签。").arg(m_bookmarks.size()));
+}
+
+
 
 void BrowserWindow::removeBookmark(const QUrl &url)
 {
@@ -651,6 +760,90 @@ void BrowserWindow::showHistory()
     m_historyDialog->activateWindow();
 }
 
+void BrowserWindow::importHistory()
+{
+    const QString path = QFileDialog::getOpenFileName(
+        this, QStringLiteral("导入历史"),
+        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+        QStringLiteral("JSON 文件 (*.json);;所有文件 (*.*)"));
+    if (path.isEmpty())
+        return;
+
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this, QStringLiteral("导入失败"),
+                             QStringLiteral("无法打开文件。"));
+        return;
+    }
+    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+    f.close();
+    if (!doc.isArray()) {
+        QMessageBox::warning(this, QStringLiteral("导入失败"),
+                             QStringLiteral("文件格式无效（应为 JSON 数组）。"));
+        return;
+    }
+
+    int added = 0;
+    for (const QJsonValue &v : doc.array()) {
+        const QJsonObject o = v.toObject();
+        const QUrl url(o.value(QStringLiteral("url")).toString());
+        if (!url.isValid())
+            continue;
+        bool exists = false;
+        for (const HistoryEntry &e : m_history) {
+            if (e.url == url) { exists = true; break; }
+        }
+        if (exists)
+            continue;
+        HistoryEntry e;
+        e.url = url;
+        e.title = o.value(QStringLiteral("title")).toString();
+        e.visitedAt = QDateTime::fromString(
+            o.value(QStringLiteral("time")).toString(), Qt::ISODate);
+        m_history.prepend(e);
+        ++added;
+    }
+
+    saveHistory();
+    if (m_historyDialog)
+        m_historyDialog->setEntries(m_history);
+    QMessageBox::information(this, QStringLiteral("导入完成"),
+        QStringLiteral("新增 %1 条历史记录。").arg(added));
+}
+
+void BrowserWindow::exportHistory()
+{
+    const QString path = QFileDialog::getSaveFileName(
+        this, QStringLiteral("导出历史"),
+        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+            + QStringLiteral("/breeze-history.json"),
+        QStringLiteral("JSON 文件 (*.json)"));
+    if (path.isEmpty())
+        return;
+
+    QJsonArray arr;
+    for (const HistoryEntry &e : m_history) {
+        QJsonObject o;
+        o.insert(QStringLiteral("title"), e.title);
+        o.insert(QStringLiteral("url"), e.url.toString());
+        o.insert(QStringLiteral("time"), e.visitedAt.toString(Qt::ISODate));
+        arr.append(o);
+    }
+
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly)) {
+        QMessageBox::warning(this, QStringLiteral("导出失败"),
+                             QStringLiteral("无法写入文件。"));
+        return;
+    }
+    f.write(QJsonDocument(arr).toJson(QJsonDocument::Indented));
+    f.close();
+
+    QMessageBox::information(this, QStringLiteral("导出完成"),
+        QStringLiteral("已导出 %1 条历史记录。").arg(m_history.size()));
+}
+
+
 
 WebView *BrowserWindow::currentView() const
 {
@@ -752,6 +945,7 @@ WebView *BrowserWindow::createTabView(bool privateMode)
         ? new WebView(privateProfile(), this)
         : new WebView(this);
     view->setProperty("breezePrivate", privateMode);
+    view->setAdBlocker(m_adBlocker);
 
     // 允许网页通过脚本打开新窗口（由 createWindow 回调接管）
     view->settings()->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, true);
@@ -761,6 +955,19 @@ WebView *BrowserWindow::createTabView(bool privateMode)
     view->setNewTabProvider([this]() -> WebView * {
         return createTabView();
     });
+
+    // 右键菜单 -> AI 处理选中文字
+    connect(view, &WebView::aiActionRequested, this,
+            [this](const QString &action, const QString &text) {
+                const QString prompt = (action == QStringLiteral("translate"))
+                    ? QStringLiteral("请把下面的内容翻译成简体中文（若已是中文则翻译成英文）：\n\n") + text
+                    : (action == QStringLiteral("rewrite"))
+                    ? QStringLiteral("请改写下面的内容，使表达更清晰自然：\n\n") + text
+                    : QStringLiteral("请用简体中文解释下面的内容：\n\n") + text;
+                AiDialog dlg(this);
+                dlg.askWithPrompt(prompt);
+                dlg.exec();
+            });
 
     connect(view, &QWebEngineView::loadStarted, this, &BrowserWindow::onLoadStarted);
     connect(view, &QWebEngineView::loadProgress, this, &BrowserWindow::onLoadProgress);
@@ -1012,6 +1219,16 @@ void BrowserWindow::showSyncDialog()
     SyncDialog dlg(this);
     dlg.exec();
 }
+
+void BrowserWindow::toggleAdBlock(bool enabled)
+{
+    if (m_adBlocker)
+        m_adBlocker->setEnabled(enabled);
+    statusBar()->showMessage(
+        enabled ? QStringLiteral("广告拦截已启用")
+                : QStringLiteral("广告拦截已关闭"), 2000);
+}
+
 
 void BrowserWindow::showUserScriptManager()
 {

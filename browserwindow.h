@@ -18,6 +18,7 @@ class QMenu;
 class QLabel;
 class QWebEngineProfile;
 class WebView;
+class AdBlocker;
 class DownloadManager;
 class HistoryDialog;
 
@@ -106,6 +107,17 @@ private slots:
     void injectUserScripts(WebView *view);
     void showAiChat();
     void aiSummarizePage();
+    // ---- 广告拦截 ----
+    void toggleAdBlock(bool enabled);
+
+    // 书签导入导出
+    void importBookmarks();
+    void exportBookmarks();
+
+    // 历史导入导出
+    void importHistory();
+    void exportHistory();
+
 
 private:
     // ---- 初始化 ----
@@ -177,6 +189,7 @@ private:
 
     // ---- 子系统 ----
     DownloadManager   *m_downloadManager = nullptr;
+    AdBlocker         *m_adBlocker       = nullptr;
     HistoryDialog     *m_historyDialog   = nullptr;
     QWebEngineProfile *m_privateProfile  = nullptr;
 };
