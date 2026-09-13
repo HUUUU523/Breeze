@@ -31,6 +31,7 @@
 #include <QCloseEvent>
 #include <QCompleter>
 #include <QStringListModel>
+#include <QDate>
 #include <QDateTime>
 #include <QActionGroup>
 #include <QDesktopServices>
@@ -41,6 +42,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QInputDialog>
+#include <QPushButton>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -304,6 +306,8 @@ void BrowserWindow::setupActions()
     QAction *actSync = mainMenu->addAction(QStringLiteral("云同步…"));
     mainMenu->addSeparator();
 
+    QAction *actSaveSession = mainMenu->addAction(QStringLiteral("保存当前会话…"));
+    QAction *actManageSession = mainMenu->addAction(QStringLiteral("会话管理…"));
     QAction *actCheckUpdate = mainMenu->addAction(QStringLiteral("检查更新…"));
     QAction *actClearData = mainMenu->addAction(QStringLiteral("清除浏览数据…"));
     QAction *actCookies = mainMenu->addAction(QStringLiteral("Cookie 管理…"));
@@ -2279,6 +2283,113 @@ void BrowserWindow::restoreSession()
         m_tabs->setCurrentIndex(idx);
     else if (m_tabs->count() > 0)
         m_tabs->setCurrentIndex(0);
+}
+
+void BrowserWindow::saveNamedSession()
+{
+    if (!m_tabs)
+        return;
+    QStringList urls;
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto *v = qobject_cast<WebView *>(m_tabs->widget(i));
+        if (!v || v->property("breezePrivate").toBool())
+            continue;
+        const QUrl u = v->url();
+        if (u.isValid() && !u.isEmpty())
+            urls << u.toString();
+    }
+    if (urls.isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("保存会话"),
+                                 QStringLiteral("当前没有可保存的标签页。"));
+        return;
+    }
+
+    bool ok = false;
+    const QString name = QInputDialog::getText(
+        this, QStringLiteral("保存会话"), QStringLiteral("会话名称："),
+        QLineEdit::Normal, QStringLiteral("会话 %1").arg(QDate::currentDate().toString(QStringLiteral("MM-dd"))),
+        &ok).trimmed();
+    if (!ok || name.isEmpty())
+        return;
+
+    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    s.beginGroup(QStringLiteral("namedSessions"));
+    s.setValue(name + QStringLiteral("/urls"), urls);
+    s.endGroup();
+
+    statusBar()->showMessage(QStringLiteral("会话已保存：%1（%2 个标签）")
+                                 .arg(name).arg(urls.size()), 3000);
+}
+
+void BrowserWindow::manageSessions()
+{
+    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    s.beginGroup(QStringLiteral("namedSessions"));
+    const QStringList names = s.childGroups();
+    s.endGroup();
+
+    if (names.isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("会话管理"),
+                                 QStringLiteral("还没有保存的会话。"));
+        return;
+    }
+
+    // 简单列表对话框：选中恢复 / 删除
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("会话管理"));
+    dlg.resize(420, 360);
+    auto *layout = new QVBoxLayout(&dlg);
+    auto *list = new QListWidget(&dlg);
+    layout->addWidget(list, 1);
+    auto *btnRow = new QHBoxLayout;
+    auto *openBtn = new QPushButton(QStringLiteral("恢复"), &dlg);
+    auto *delBtn  = new QPushButton(QStringLiteral("删除"), &dlg);
+    auto *closeBtn = new QPushButton(QStringLiteral("关闭"), &dlg);
+    btnRow->addWidget(openBtn);
+    btnRow->addWidget(delBtn);
+    btnRow->addStretch();
+    btnRow->addWidget(closeBtn);
+    layout->addLayout(btnRow);
+
+    for (const QString &n : names)
+        list->addItem(n);
+
+    connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+
+    connect(delBtn, &QPushButton::clicked, &dlg, [this, list, &names]() {
+        auto *item = list->currentItem();
+        if (!item)
+            return;
+        const QString name = item->text();
+        if (QMessageBox::question(this, QStringLiteral("删除会话"),
+                QStringLiteral("删除会话「%1」？").arg(name)) != QMessageBox::Yes)
+            return;
+        QSettings s2(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+        s2.beginGroup(QStringLiteral("namedSessions"));
+        s2.remove(name);
+        s2.endGroup();
+        delete item;
+    });
+
+    connect(openBtn, &QPushButton::clicked, &dlg, [this, list, &dlg]() {
+        auto *item = list->currentItem();
+        if (!item)
+            return;
+        const QString name = item->text();
+        QSettings s2(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+        s2.beginGroup(QStringLiteral("namedSessions"));
+        const QStringList urls = s2.value(name + QStringLiteral("/urls")).toStringList();
+        s2.endGroup();
+
+        for (const QString &u : urls)
+            createTab(QUrl(u), false);
+        if (!urls.isEmpty())
+            m_tabs->setCurrentIndex(m_tabs->count() - urls.size());
+
+        dlg.accept();
+    });
+
+    dlg.exec();
 }
 
 void BrowserWindow::printPage()

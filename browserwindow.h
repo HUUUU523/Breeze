@@ -104,6 +104,8 @@ private slots:
     // ---- 会话 / 设置 / 主题 ----
     void saveSession() const;
     void restoreSession();
+    void saveNamedSession();     // 保存当前标签为一组命名会话
+    void manageSessions();       // 会话管理对话框
     void showSettings();
     void applyTheme();
     void setThemeMode(const QString &mode);   // "system" / "light" / "dark"
