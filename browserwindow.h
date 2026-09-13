@@ -111,13 +111,20 @@ private slots:
     // ---- 更新 ----
     void checkForUpdates();
 
+    // ---- AI 侧边栏 ----
+    void toggleAiSidebar();
+
     // ---- 隐私 ----
     void clearBrowsingData();
+
+    // ---- 用户脚本在线安装 ----
+    void installUserScriptFromUrl(const QUrl &url);
 
     // ---- 扩展 / 工具 ----
     void showUserScriptManager();
     void showToolbox();
     void injectUserScripts(WebView *view);
+    void injectStartScripts(WebView *view, const QUrl &url);   // @run-at document-start
     void showAiChat();
     void aiSummarizePage();
     // ---- 广告拦截 ----
@@ -211,6 +218,8 @@ private:
 
     // ---- 数据 ----
     QList<Bookmark>     m_bookmarks;
+    QHash<QString, QIcon> m_faviconCache;   // url -> favicon
+    class AiSidebar *m_aiSidebar = nullptr;
     QList<HistoryEntry> m_history;
     QList<QUrl>         m_closedTabs;   // 最近关闭的标签（栈，上限 20）
     QUrl                m_homeUrl{"https://www.bing.com"};

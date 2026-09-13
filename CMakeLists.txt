@@ -59,6 +59,10 @@ qt_add_executable(Breeze WIN32
     updatemanager.cpp
     logger.h
     logger.cpp
+    cookiemanagerdialog.h
+    cookiemanagerdialog.cpp
+    aisidebar.h
+    aisidebar.cpp
 )
 
 target_link_libraries(Breeze PRIVATE

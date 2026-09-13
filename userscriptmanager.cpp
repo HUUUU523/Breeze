@@ -47,6 +47,50 @@ bool UserScriptManager::matchesUrl(const UserScript &script, const QUrl &url)
     return false;
 }
 
+void UserScriptManager::parseMetadata(UserScript &script)
+{
+    // 只解析头部 ==UserScript== ... ==/UserScript== 块
+    const QString head = script.code.left(4000);
+    const int begin = head.indexOf(QStringLiteral("==UserScript=="));
+    if (begin < 0)
+        return;
+    const int end = head.indexOf(QStringLiteral("==/UserScript=="), begin);
+    if (end < 0)
+        return;
+    const QString block = head.mid(begin, end - begin);
+
+    QStringList matches;
+    for (const QString &rawLine : block.split(QLatin1Char('\n'))) {
+        QString line = rawLine.trimmed();
+        if (!line.startsWith(QLatin1Char('@')))
+            continue;
+        const int sp = line.indexOf(QRegularExpression(QStringLiteral("\\s")));
+        if (sp < 0)
+            continue;
+        const QString key = line.mid(1, sp - 1).trimmed().toLower();
+        const QString val = line.mid(sp + 1).trimmed();
+        if (val.isEmpty())
+            continue;
+
+        if (key == QStringLiteral("name"))
+            script.name = val;
+        else if (key == QStringLiteral("description"))
+            script.description = val;
+        else if (key == QStringLiteral("match") || key == QStringLiteral("include"))
+            matches << val;
+        else if (key == QStringLiteral("run-at"))
+            script.runAt = val;
+        else if (key == QStringLiteral("grant"))
+            script.grants << val;
+        else if (key == QStringLiteral("require"))
+            script.requires << val;
+    }
+
+    // @match 优先覆盖手动填写的 match（若解析到）
+    if (!matches.isEmpty())
+        script.match = matches.join(QLatin1Char('\n'));
+}
+
 static QString scriptsFilePath()
 {
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);

@@ -2,6 +2,8 @@
 #include "aidialog.h"
 #include "bookmarkmanager.h"
 #include "browserwindow.h"
+#include "aisidebar.h"
+#include "cookiemanagerdialog.h"
 #include "downloadmanager.h"
 #include "historymanager.h"
 #include "settingsdialog.h"
@@ -39,6 +41,9 @@
 #include <QJsonObject>
 #include <QMenu>
 #include <QMessageBox>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QLabel>
 #include <QHash>
 #include <QSet>
@@ -59,6 +64,8 @@
 #include <QWebEngineHistory>
 #include <QWebEngineProfile>
 #include <QWebEngineCookieStore>
+#include <QWebEngineScript>
+#include <QWebEngineScriptCollection>
 #include <QWebEngineSettings>
 #include <QWebEngineView>
 #include <QStatusBar>
@@ -271,6 +278,8 @@ void BrowserWindow::setupActions()
 
     QAction *actAiChat = mainMenu->addAction(QStringLiteral("AI 对话…"));
     QAction *actAiSummary = mainMenu->addAction(QStringLiteral("AI 总结当前页"));
+    QAction *actAiSidebar = mainMenu->addAction(QStringLiteral("AI 侧边栏"));
+    QAction *actPageQa = mainMenu->addAction(QStringLiteral("网页问答…"));
     mainMenu->addSeparator();
 
     QAction *actAdBlock = mainMenu->addAction(QStringLiteral("拦截广告"));
@@ -285,6 +294,7 @@ void BrowserWindow::setupActions()
 
     QAction *actCheckUpdate = mainMenu->addAction(QStringLiteral("检查更新…"));
     QAction *actClearData = mainMenu->addAction(QStringLiteral("清除浏览数据…"));
+    QAction *actCookies = mainMenu->addAction(QStringLiteral("Cookie 管理…"));
     m_actSettings = mainMenu->addAction(QStringLiteral("设置…"));
     QAction *actQuit = mainMenu->addAction(QStringLiteral("退出"));
     actQuit->setShortcut(QKeySequence(QStringLiteral("Ctrl+Q")));
@@ -318,11 +328,30 @@ void BrowserWindow::setupActions()
     connect(m_actThemeDark,   &QAction::triggered, this, [this]{ setThemeMode(QStringLiteral("dark")); });
     connect(actAiChat, &QAction::triggered, this, &BrowserWindow::showAiChat);
     connect(actAiSummary, &QAction::triggered, this, &BrowserWindow::aiSummarizePage);
+    connect(actAiSidebar, &QAction::triggered, this, &BrowserWindow::toggleAiSidebar);
+    connect(actPageQa, &QAction::triggered, this, [this]() {
+        if (!m_aiSidebar) {
+            m_aiSidebar = new AiSidebar(this);
+            addDockWidget(Qt::RightDockWidgetArea, m_aiSidebar);
+        }
+        m_aiSidebar->show();
+        auto *v = currentView();
+        if (v) {
+            v->page()->toPlainText([this, v](const QString &text) {
+                if (m_aiSidebar)
+                    m_aiSidebar->setPageContext(v->title(), text.left(8000));
+            });
+        }
+    });
     connect(actUs, &QAction::triggered, this, &BrowserWindow::showUserScriptManager);
     connect(actToolbox, &QAction::triggered, this, &BrowserWindow::showToolbox);
     connect(actSync, &QAction::triggered, this, &BrowserWindow::showSyncDialog);
     connect(actCheckUpdate, &QAction::triggered, this, &BrowserWindow::checkForUpdates);
     connect(actClearData, &QAction::triggered, this, &BrowserWindow::clearBrowsingData);
+    connect(actCookies, &QAction::triggered, this, [this]() {
+        CookieManagerDialog dlg(this);
+        dlg.exec();
+    });
     connect(m_actSettings, &QAction::triggered, this, &BrowserWindow::showSettings);
     // ---- 阅读模式 / 标签栏 / 手势 ----
     m_actReader = mainMenu->addAction(QStringLiteral("阅读模式"));
@@ -435,6 +464,7 @@ void BrowserWindow::setupBookmarks()
     // 书签栏（单独一行工具条）
     m_bookmarkBar = new QToolBar(QStringLiteral("Bookmarks"), this);
     m_bookmarkBar->setMovable(false);
+    m_bookmarkBar->setIconSize(QSize(16, 16));
     addToolBarBreak();
     addToolBar(m_bookmarkBar);
 
@@ -511,6 +541,20 @@ void BrowserWindow::rebuildBookmarkBar()
             QAction *a = menu->addAction(text);
             a->setToolTip(b.url.toString());
             const QUrl url = b.url;
+            const QString urlKey = url.toString();
+            if (m_faviconCache.contains(urlKey)) {
+                const QIcon ico = m_faviconCache.value(urlKey);
+                if (!ico.isNull())
+                    a->setIcon(ico);
+            } else {
+                QWebEngineProfile::defaultProfile()->requestIconForPageURL(
+                    url, 16, [this, a, urlKey](const QIcon &icon, const QUrl &, const QUrl &) {
+                        if (!icon.isNull()) {
+                            m_faviconCache.insert(urlKey, icon);
+                            a->setIcon(icon);
+                        }
+                    });
+            }
             connect(a, &QAction::triggered, this, [this, url]{ openBookmark(url); });
         }
         auto *btn = new QToolButton(m_bookmarkBar);
@@ -526,7 +570,22 @@ void BrowserWindow::addBookmarkAction(const Bookmark &b, QToolBar *bar)
     const QString text = b.title.isEmpty() ? b.url.host() : b.title;
     QAction *act = bar->addAction(text);
     act->setToolTip(b.url.toString());
+    // favicon：先查缓存；未命中异步请求
     const QUrl url = b.url;
+    const QString urlKey = url.toString();
+    if (m_faviconCache.contains(urlKey)) {
+        const QIcon ico = m_faviconCache.value(urlKey);
+        if (!ico.isNull())
+            act->setIcon(ico);
+    } else {
+        QWebEngineProfile::defaultProfile()->requestIconForPageURL(
+            url, 16, [this, act, urlKey](const QIcon &icon, const QUrl &, const QUrl &) {
+                if (!icon.isNull()) {
+                    m_faviconCache.insert(urlKey, icon);
+                    act->setIcon(icon);
+                }
+            });
+    }
 
     connect(act, &QAction::triggered, this, [this, url]{ openBookmark(url); });
 
@@ -721,6 +780,17 @@ void BrowserWindow::setupDownloads()
             [this](QWebEngineDownloadRequest *download) {
                 if (!download)
                     return;
+
+                // .user.js → 走在线安装流程（不落盘为下载）
+                const QString name = download->downloadFileName();
+                const QUrl srcUrl = download->url();
+                if (name.endsWith(QStringLiteral(".user.js"))
+                    || srcUrl.toString().endsWith(QStringLiteral(".user.js"))) {
+                    download->cancel();
+                    installUserScriptFromUrl(srcUrl);
+                    return;
+                }
+
                 // 使用系统"下载"目录，避免 Program Files 下无写权限
                 QString dir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
                 if (dir.isEmpty())
@@ -737,6 +807,47 @@ void BrowserWindow::showDownloads()
 {
     if (m_downloadManager)
         m_downloadManager->show();
+}
+
+void BrowserWindow::installUserScriptFromUrl(const QUrl &url)
+{
+    statusBar()->showMessage(QStringLiteral("正在获取用户脚本…"), 3000);
+
+    auto *nam = new QNetworkAccessManager(this);
+    QNetworkRequest req{url};
+    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Breeze"));
+    QNetworkReply *reply = nam->get(req);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, nam, url]() {
+        reply->deleteLater();
+        nam->deleteLater();
+
+        if (reply->error() != QNetworkReply::NoError) {
+            QMessageBox::warning(this, QStringLiteral("安装失败"),
+                                 QStringLiteral("无法获取脚本：%1").arg(reply->errorString()));
+            return;
+        }
+
+        UserScript s;
+        s.code = QString::fromUtf8(reply->readAll());
+        s.name = url.fileName();
+        UserScriptManager::parseMetadata(s);
+
+        const QString info = QStringLiteral("名称：%1\n匹配：%2\n运行时机：%3\n\n是否安装该用户脚本？")
+            .arg(s.name.isEmpty() ? url.fileName() : s.name,
+                 s.match.isEmpty() ? QStringLiteral("(未指定)") : s.match,
+                 s.runAt);
+
+        if (QMessageBox::question(this, QStringLiteral("安装用户脚本"), info)
+            != QMessageBox::Yes)
+            return;
+
+        QList<UserScript> scripts = UserScriptManager::loadScripts();
+        scripts.append(s);
+        UserScriptManager::saveScripts(scripts);
+
+        statusBar()->showMessage(QStringLiteral("已安装用户脚本：%1").arg(s.name), 3000);
+    });
 }
 
 // ===================== 历史记录 =====================
@@ -1255,8 +1366,11 @@ WebView *BrowserWindow::createTab(const QUrl &url, bool switchToTab)
     if (!switchToTab && index >= 0 && m_tabs->count() > 1)
         m_tabs->setCurrentIndex(index - 1 < 0 ? index + 1 : index - 1);
 
-    if (url.isValid() && !url.isEmpty())
+    if (url.isValid() && !url.isEmpty()) {
+        // 先注册 document-start 脚本，再导航
+        injectStartScripts(view, url);
         view->setUrl(url);
+    }
 
     return view;
 }
@@ -1698,6 +1812,26 @@ void BrowserWindow::showToolbox()
     dlg.exec();
 }
 
+void BrowserWindow::toggleAiSidebar()
+{
+    if (!m_aiSidebar) {
+        m_aiSidebar = new AiSidebar(this);
+        addDockWidget(Qt::RightDockWidgetArea, m_aiSidebar);
+    }
+    m_aiSidebar->setVisible(!m_aiSidebar->isVisible());
+
+    if (m_aiSidebar->isVisible()) {
+        // 带入当前页正文作为上下文
+        auto *v = currentView();
+        if (v) {
+            v->page()->toPlainText([this, v](const QString &text) {
+                if (m_aiSidebar)
+                    m_aiSidebar->setPageContext(v->title(), text.left(8000));
+            });
+        }
+    }
+}
+
 void BrowserWindow::showAiChat()
 {
     AiDialog dlg(this);
@@ -1737,6 +1871,33 @@ void BrowserWindow::aiSummarizePage()
 }
 
 
+void BrowserWindow::injectStartScripts(WebView *view, const QUrl &url)
+{
+    if (!view || !view->page())
+        return;
+
+    const QList<UserScript> scripts = UserScriptManager::loadScripts();
+    QWebEngineScriptCollection &collection = view->page()->scripts();
+
+    int idx = 0;
+    for (const UserScript &s : scripts) {
+        if (!s.enabled || s.isCss)
+            continue;
+        if (s.runAt != QStringLiteral("document-start"))
+            continue;
+        if (!UserScriptManager::matchesUrl(s, url))
+            continue;
+
+        QWebEngineScript qs;
+        qs.setName(QStringLiteral("breeze-start-%1-%2").arg(idx++).arg(s.name));
+        qs.setSourceCode(s.code);
+        qs.setInjectionPoint(QWebEngineScript::DocumentCreation);
+        qs.setWorldId(QWebEngineScript::MainWorld);
+        qs.setRunsOnSubFrames(false);
+        collection.insert(qs);
+    }
+}
+
 void BrowserWindow::injectUserScripts(WebView *view)
 {
     if (!view)
@@ -1746,6 +1907,9 @@ void BrowserWindow::injectUserScripts(WebView *view)
         if (!s.enabled)
             continue;
         if (!UserScriptManager::matchesUrl(s, view->url()))
+            continue;
+        // document-start 脚本已在加载前通过 QWebEngineScript 注册，跳过
+        if (!s.isCss && s.runAt == QStringLiteral("document-start"))
             continue;
 
         if (s.isCss) {
