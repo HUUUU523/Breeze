@@ -59,6 +59,7 @@ private slots:
     void onReopenClosedTab();              // Ctrl+Shift+T
     void onTabBarContextMenu(const QPoint &pos);  // 右键标签：静音等
     void showBlockedDetails();             // 盾牌点击：查看已拦截列表
+    void togglePinTab(int index);          // 固定/取消固定标签
 
     // ---- 导航 ----
     void onUrlEntered();
@@ -222,6 +223,7 @@ private:
     class AiSidebar *m_aiSidebar = nullptr;
     QList<HistoryEntry> m_history;
     QList<QUrl>         m_closedTabs;   // 最近关闭的标签（栈，上限 20）
+    QSet<QObject *>     m_pinnedTabs;   // 已固定的标签（存 view 指针）
     QUrl                m_homeUrl{"https://www.bing.com"};
 
     // ---- 子系统 ----

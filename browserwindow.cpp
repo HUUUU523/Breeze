@@ -1386,6 +1386,11 @@ void BrowserWindow::onNewTab()
 void BrowserWindow::onCloseTab(int index)
 {
     QWidget *w = m_tabs->widget(index);
+    // 固定标签不允许关闭
+    if (w && m_pinnedTabs.contains(w)) {
+        statusBar()->showMessage(QStringLiteral("该标签已固定，请先取消固定"), 2000);
+        return;
+    }
     if (auto *v = qobject_cast<WebView *>(w)) {
         const QUrl u = v->url();
         // 不记录空白页与隐私标签
@@ -1429,11 +1434,35 @@ void BrowserWindow::onTabBarContextMenu(const QPoint &pos)
         connect(actMute, &QAction::triggered, this, [view, muted]() {
             view->page()->setAudioMuted(!muted);
         });
+
+        const bool pinned = m_pinnedTabs.contains(view);
+        QAction *actPin = menu.addAction(pinned ? QStringLiteral("取消固定")
+                                                : QStringLiteral("固定标签"));
+        connect(actPin, &QAction::triggered, this, [this, index]() { togglePinTab(index); });
     }
     QAction *actClose = menu.addAction(QStringLiteral("关闭标签"));
     connect(actClose, &QAction::triggered, this, [this, index]() { onCloseTab(index); });
 
     menu.exec(m_tabs->tabBar()->mapToGlobal(pos));
+}
+
+void BrowserWindow::togglePinTab(int index)
+{
+    auto *view = qobject_cast<WebView *>(m_tabs->widget(index));
+    if (!view)
+        return;
+
+    QString title = view->title().isEmpty() ? QStringLiteral("新标签页") : view->title();
+
+    if (m_pinnedTabs.contains(view)) {
+        m_pinnedTabs.remove(view);
+        m_tabs->setTabText(index, title);
+        statusBar()->showMessage(QStringLiteral("已取消固定"), 1500);
+    } else {
+        m_pinnedTabs.insert(view);
+        m_tabs->setTabText(index, QStringLiteral("📌 ") + title);
+        statusBar()->showMessage(QStringLiteral("已固定标签"), 1500);
+    }
 }
 
 void BrowserWindow::onTabChanged(int index)
@@ -1822,6 +1851,29 @@ void BrowserWindow::aiSummarizePage()
 }
 
 
+namespace {
+// 为带 GM_* 授权的脚本生成 localStorage 垫片
+static QString gmShim(const UserScript &s)
+{
+    if (s.grants.isEmpty())
+        return QString();
+    bool needStorage = false;
+    for (const QString &g : s.grants) {
+        if (g.startsWith(QStringLiteral("GM_")) && g.contains(QStringLiteral("Value")))
+            needStorage = true;
+    }
+    if (!needStorage)
+        return QString();
+    return QStringLiteral(
+        "(function(){"
+        "window.GM_setValue=function(k,v){try{localStorage.setItem('__breeze_gm_'+k,JSON.stringify(v));}catch(e){}};"
+        "window.GM_getValue=function(k,d){try{var v=localStorage.getItem('__breeze_gm_'+k);"
+        "return v===null?d:JSON.parse(v);}catch(e){return d;}};"
+        "window.GM_deleteValue=function(k){try{localStorage.removeItem('__breeze_gm_'+k);}catch(e){}};"
+        "})();");
+}
+}
+
 void BrowserWindow::injectStartScripts(WebView *view, const QUrl &url)
 {
     if (!view || !view->page())
@@ -1841,7 +1893,7 @@ void BrowserWindow::injectStartScripts(WebView *view, const QUrl &url)
 
         QWebEngineScript qs;
         qs.setName(QStringLiteral("breeze-start-%1-%2").arg(idx++).arg(s.name));
-        qs.setSourceCode(s.code);
+        qs.setSourceCode(gmShim(s) + s.code);
         qs.setInjectionPoint(QWebEngineScript::DocumentCreation);
         qs.setWorldId(QWebEngineScript::MainWorld);
         qs.setRunsOnSubFrames(false);
@@ -1875,7 +1927,8 @@ void BrowserWindow::injectUserScripts(WebView *view)
                     .arg(cssLiteral);
             view->page()->runJavaScript(js);
         } else {
-            view->page()->runJavaScript(s.code);
+            const QString shim = gmShim(s);
+            view->page()->runJavaScript(shim + s.code);
         }
     }
 }
@@ -2180,6 +2233,8 @@ void BrowserWindow::updateTabTitle(WebView *view)
     }
     if (title.size() > 24)
         title = title.left(24) + QStringLiteral("\u2026");
+    if (m_pinnedTabs.contains(view))
+        title = QStringLiteral("📌 ") + title;
     m_tabs->setTabText(index, title);
     m_tabs->setTabToolTip(index, view->title());
 
