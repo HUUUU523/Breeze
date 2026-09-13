@@ -1416,7 +1416,9 @@ WebView *BrowserWindow::createTab(const QUrl &url, bool switchToTab)
 
 void BrowserWindow::onNewTab()
 {
-    createTab(homeUrl());
+    WebView *view = createTab(QUrl(), true);
+    if (view)
+        view->setHtml(dialsHtml());
     m_urlBar->setFocus();
     m_urlBar->selectAll();
 }
@@ -1543,6 +1545,70 @@ void BrowserWindow::onUrlEntered()
     view->setFocus();
 }
 
+
+QString BrowserWindow::dialsHtml() const
+{
+    // 收集候选：书签优先，其次最近历史，去重
+    QStringList items;
+    QSet<QString> seen;
+    auto addItem = [&](const QString &title, const QUrl &url) {
+        const QString u = url.toString();
+        if (u.isEmpty() || seen.contains(u)) return;
+        if (!url.scheme().startsWith(QStringLiteral("http"))) return;
+        seen.insert(u);
+        const QString t = title.isEmpty() ? url.host() : title;
+        items << QStringLiteral("<a class=\"tile\" href=\"%1\"><span class=\"host\">%2</span><span class=\"title\">%3</span></a>")
+            .arg(u.toHtmlEscaped(),
+                 url.host().toHtmlEscaped(),
+                 t.toHtmlEscaped());
+    };
+    for (const Bookmark &b : m_bookmarks) {
+        if (items.size() >= 12) break;
+        addItem(b.title, b.url);
+    }
+    for (auto it = m_history.crbegin(); it != m_history.crend() && items.size() < 12; ++it)
+        addItem(it->title, it->url);
+
+    const QString tiles = items.isEmpty()
+        ? QStringLiteral("<p class=\"empty\">暂无书签或历史。访问网站后会出现在这里。</p>")
+        : items.join(QString());
+
+    return QStringLiteral(R"HTML(
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #e8f4fd 0%%, #f5f2ea 100%%);
+    color: #222;
+  }
+  h1 { font-weight: 300; font-size: 40px; color: #3a6ea5; margin: 0 0 40px; letter-spacing: 4px; }
+  .grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 18px; max-width: 720px; padding: 0 20px;
+  }
+  .tile {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    width: 150px; height: 110px; padding: 10px;
+    background: #fff; border-radius: 12px; text-decoration: none; color: #333;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: transform .15s, box-shadow .15s;
+    overflow: hidden;
+  }
+  .tile:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
+  .host { font-size: 13px; color: #3a6ea5; font-weight: 600; }
+  .title { font-size: 12px; color: #888; margin-top: 6px; text-align: center;
+           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+  .empty { color: #999; font-size: 15px; }
+</style></head>
+<body>
+  <h1>Breeze</h1>
+  <div class="grid">%1</div>
+</body></html>
+)HTML").arg(tiles);
+}
 
 QUrl BrowserWindow::homeUrl() const
 {

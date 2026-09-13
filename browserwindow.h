@@ -166,6 +166,7 @@ private:
 
     // ---- 地址栏辅助 ----
     QUrl homeUrl() const;
+    QString dialsHtml() const;   // 新标签页快速拨号
     QUrl normalizedUrl(const QString &text) const;
     void refreshUrlCompleter(const QString &prefix);
     void refreshShieldForCurrent();
