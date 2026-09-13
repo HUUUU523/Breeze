@@ -10,6 +10,8 @@
 
 class QCloseEvent;
 class QLineEdit;
+class QCompleter;
+class QStringListModel;
 class QProgressBar;
 class QTabWidget;
 class QToolBar;
@@ -54,6 +56,9 @@ private slots:
     void onNewPrivateTab();
     void onCloseTab(int index);
     void onTabChanged(int index);
+    void onReopenClosedTab();              // Ctrl+Shift+T
+    void onTabBarContextMenu(const QPoint &pos);  // 右键标签：静音等
+    void showBlockedDetails();             // 盾牌点击：查看已拦截列表
 
     // ---- 导航 ----
     void onUrlEntered();
@@ -82,6 +87,7 @@ private slots:
     void recordHistory(WebView *view = nullptr);
 
     // ---- 页面 ----
+    void capturePage();
     void showFindBar();
     void hideFindBar();
     void findNext();
@@ -104,6 +110,9 @@ private slots:
 
     // ---- 更新 ----
     void checkForUpdates();
+
+    // ---- 隐私 ----
+    void clearBrowsingData();
 
     // ---- 扩展 / 工具 ----
     void showUserScriptManager();
@@ -145,6 +154,8 @@ private:
     // ---- 地址栏辅助 ----
     QUrl homeUrl() const;
     QUrl normalizedUrl(const QString &text) const;
+    void refreshUrlCompleter(const QString &prefix);
+    void refreshShieldForCurrent();
 
     // ---- 书签持久化 ----
     void loadBookmarks();
@@ -166,7 +177,9 @@ private:
     // ---- UI ----
     QTabWidget   *m_tabs        = nullptr;
     QLineEdit    *m_urlBar      = nullptr;
+    QCompleter   *m_completer   = nullptr;
     QProgressBar *m_progress    = nullptr;
+    QLabel       *m_shieldLabel = nullptr;
     QToolBar     *m_bookmarkBar = nullptr;
     QToolBar     *m_findBar     = nullptr;
     QLineEdit    *m_findEdit    = nullptr;
@@ -199,6 +212,7 @@ private:
     // ---- 数据 ----
     QList<Bookmark>     m_bookmarks;
     QList<HistoryEntry> m_history;
+    QList<QUrl>         m_closedTabs;   // 最近关闭的标签（栈，上限 20）
     QUrl                m_homeUrl{"https://www.bing.com"};
 
     // ---- 子系统 ----

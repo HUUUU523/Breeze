@@ -3,6 +3,7 @@
 
 #include <QWebEngineView>
 #include <QWebEnginePage>
+#include <QWebEngineCertificateError>
 #include <functional>
 
 class QWebEngineProfile;
@@ -20,6 +21,8 @@ public:
 
 signals:
     void hoverUrlChanged(const QString &url);
+    // 划词工具栏动作：action = explain/translate/search，text 为选中文字
+    void selectionActionRequested(const QString &action, const QString &text);
 
 protected:
     void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level,
@@ -49,6 +52,12 @@ public:
     // 安装悬停链接监听（注入 JS，经 console.log 前缀回传）
     void installHoverWatcher();
 
+    // 安装划词工具栏（注入 JS）
+    void installSelectionToolbar();
+
+    // 是否启用划词工具栏（默认开）
+    void setSelectionToolbarEnabled(bool enabled);
+
 signals:
     // 请求对选中文字执行 AI 操作（action: explain / translate / rewrite）
     void aiActionRequested(const QString &action, const QString &text);
@@ -59,12 +68,23 @@ signals:
     // 请求用指定搜索引擎搜索选中文字
     void searchRequested(const QString &engine, const QString &text);
 
+    // 划词工具栏动作
+    void selectionActionRequested(const QString &action, const QString &text);
+
+
 protected:
     QWebEngineView *createWindow(QWebEnginePage::WebWindowType type) override;
     void contextMenuEvent(QContextMenuEvent *event) override;
 
+private slots:
+    void onCertificateError(const QWebEngineCertificateError &error);
+
 private:
+    void connectPageSignals();
+
     std::function<WebView *(bool background)> m_newTabProvider;
+    bool m_selectionToolbarEnabled = true;
 };
 
 #endif // WEBVIEW_H
+

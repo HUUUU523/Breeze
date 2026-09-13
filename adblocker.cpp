@@ -11,6 +11,7 @@ AdBlocker::AdBlocker(QObject *parent)
     // 读取开关和自定义规则
     QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
     m_enabled = s.value(QStringLiteral("adblock/enabled"), true).toBool();
+    m_httpsUpgrade = s.value(QStringLiteral("adblock/httpsUpgrade"), false).toBool();
     m_customRules = s.value(QStringLiteral("adblock/rules")).toStringList();
     for (const QString &r : m_customRules)
         m_domains.insert(r.toLower());
@@ -62,6 +63,13 @@ void AdBlocker::setEnabled(bool enabled)
     m_enabled = enabled;
     QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
     s.setValue(QStringLiteral("adblock/enabled"), enabled);
+}
+
+void AdBlocker::setHttpsUpgrade(bool enabled)
+{
+    m_httpsUpgrade = enabled;
+    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    s.setValue(QStringLiteral("adblock/httpsUpgrade"), enabled);
 }
 
 void AdBlocker::addRule(const QString &rule)
@@ -117,6 +125,15 @@ void AdBlocker::interceptRequest(QWebEngineUrlRequestInfo &info)
     if (scheme != QLatin1String("http") && scheme != QLatin1String("https"))
         return;
 
+    // HTTPS 强制升级：主框架 http 请求重定向到 https
+    if (m_httpsUpgrade && scheme == QLatin1String("http")
+        && info.resourceType() == QWebEngineUrlRequestInfo::ResourceTypeMainFrame) {
+        QUrl httpsUrl = url;
+        httpsUrl.setScheme(QStringLiteral("https"));
+        info.redirect(httpsUrl);
+        return;
+    }
+
     // 放行主框架导航（避免误杀整站）
     if (info.resourceType() == QWebEngineUrlRequestInfo::ResourceTypeMainFrame)
         return;
@@ -124,5 +141,29 @@ void AdBlocker::interceptRequest(QWebEngineUrlRequestInfo &info)
     if (shouldBlock(url)) {
         info.block(true);
         ++m_blockedCount;
+
+        // 归属到 first party host（顶层页面）
+        const QString host = info.firstPartyUrl().host().toLower();
+        if (!host.isEmpty()) {
+            ++m_perHost[host];
+            QStringList &lst = m_perHostUrls[host];
+            const QString u = url.toString();
+            if (!lst.contains(u)) {
+                lst.prepend(u);
+                while (lst.size() > 50)
+                    lst.removeLast();
+            }
+            emit blockedCountChanged(host, m_perHost.value(host));
+        }
     }
+}
+
+int AdBlocker::blockedCountForHost(const QString &host) const
+{
+    return m_perHost.value(host.toLower(), 0);
+}
+
+QStringList AdBlocker::blockedUrlsForHost(const QString &host) const
+{
+    return m_perHostUrls.value(host.toLower());
 }

@@ -4,9 +4,12 @@
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QNetworkProxy>
 #include <QSettings>
+#include <QSpinBox>
 #include <QVBoxLayout>
 
 static const char *kOrg = "Breeze";
@@ -36,6 +39,27 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     form->addRow(QString(), m_historyCheck);
 
     layout->addLayout(form);
+
+    // ---- 代理 ----
+    auto *proxyBox = new QGroupBox(QStringLiteral("代理（全局，重启后生效）"), this);
+    auto *proxyForm = new QFormLayout(proxyBox);
+    m_proxyTypeCombo = new QComboBox(proxyBox);
+    m_proxyTypeCombo->addItem(QStringLiteral("不使用代理"), QStringLiteral("none"));
+    m_proxyTypeCombo->addItem(QStringLiteral("HTTP"),       QStringLiteral("http"));
+    m_proxyTypeCombo->addItem(QStringLiteral("SOCKS5"),     QStringLiteral("socks5"));
+    m_proxyHostEdit = new QLineEdit(proxyBox);
+    m_proxyHostEdit->setPlaceholderText(QStringLiteral("127.0.0.1"));
+    m_proxyPortSpin = new QSpinBox(proxyBox);
+    m_proxyPortSpin->setRange(0, 65535);
+    m_proxyUserEdit = new QLineEdit(proxyBox);
+    m_proxyPassEdit = new QLineEdit(proxyBox);
+    m_proxyPassEdit->setEchoMode(QLineEdit::Password);
+    proxyForm->addRow(QStringLiteral("类型："), m_proxyTypeCombo);
+    proxyForm->addRow(QStringLiteral("主机："), m_proxyHostEdit);
+    proxyForm->addRow(QStringLiteral("端口："), m_proxyPortSpin);
+    proxyForm->addRow(QStringLiteral("用户名："), m_proxyUserEdit);
+    proxyForm->addRow(QStringLiteral("密码："), m_proxyPassEdit);
+    layout->addWidget(proxyBox);
     layout->addWidget(new QLabel(QStringLiteral("提示：主页与搜索引擎修改后立即生效。"), this));
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
@@ -52,6 +76,14 @@ void SettingsDialog::load()
     m_homeEdit->setText(homePage());
     m_engineCombo->setCurrentText(searchEngine());
     m_historyCheck->setChecked(recordHistory());
+
+    const QString pt = proxyType();
+    const int idx = m_proxyTypeCombo->findData(pt);
+    m_proxyTypeCombo->setCurrentIndex(idx >= 0 ? idx : 0);
+    m_proxyHostEdit->setText(proxyHost());
+    m_proxyPortSpin->setValue(proxyPort());
+    m_proxyUserEdit->setText(proxyUser());
+    m_proxyPassEdit->setText(proxyPassword());
 }
 
 void SettingsDialog::onAccepted()
@@ -59,6 +91,11 @@ void SettingsDialog::onAccepted()
     setHomePage(m_homeEdit->text().trimmed());
     setSearchEngine(m_engineCombo->currentText());
     setRecordHistory(m_historyCheck->isChecked());
+    setProxy(m_proxyTypeCombo->currentData().toString(),
+             m_proxyHostEdit->text().trimmed(),
+             m_proxyPortSpin->value(),
+             m_proxyUserEdit->text(),
+             m_proxyPassEdit->text());
     accept();
 }
 
@@ -109,4 +146,68 @@ QString SettingsDialog::searchUrlTemplate(const QString &engineName)
     if (engineName == QStringLiteral("DuckDuckGo"))
         return QStringLiteral("https://duckduckgo.com/?q=%1");
     return QStringLiteral("https://www.bing.com/search?q=%1");
+}
+
+// ===================== 代理 =====================
+
+QString SettingsDialog::proxyType()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("proxy/type"), QStringLiteral("none")).toString();
+}
+
+QString SettingsDialog::proxyHost()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("proxy/host")).toString();
+}
+
+int SettingsDialog::proxyPort()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("proxy/port"), 0).toInt();
+}
+
+QString SettingsDialog::proxyUser()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("proxy/user")).toString();
+}
+
+QString SettingsDialog::proxyPassword()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("proxy/password")).toString();
+}
+
+void SettingsDialog::setProxy(const QString &type, const QString &host, int port,
+                              const QString &user, const QString &password)
+{
+    QSettings s(kOrg, kApp);
+    s.setValue(QStringLiteral("proxy/type"), type);
+    s.setValue(QStringLiteral("proxy/host"), host);
+    s.setValue(QStringLiteral("proxy/port"), port);
+    s.setValue(QStringLiteral("proxy/user"), user);
+    s.setValue(QStringLiteral("proxy/password"), password);
+}
+
+void SettingsDialog::applyProxy()
+{
+    const QString type = proxyType();
+    if (type == QStringLiteral("none") || type.isEmpty()) {
+        QNetworkProxy::setApplicationProxy(QNetworkProxy(QNetworkProxy::NoProxy));
+        return;
+    }
+
+    QNetworkProxy proxy;
+    proxy.setType(type == QStringLiteral("socks5")
+                      ? QNetworkProxy::Socks5Proxy
+                      : QNetworkProxy::HttpProxy);
+    proxy.setHostName(proxyHost());
+    proxy.setPort(static_cast<quint16>(proxyPort()));
+    if (!proxyUser().isEmpty()) {
+        proxy.setUser(proxyUser());
+        proxy.setPassword(proxyPassword());
+    }
+    QNetworkProxy::setApplicationProxy(proxy);
 }

@@ -13,11 +13,17 @@
 #include "webview.h"
 
 #include <QAction>
+#include <QCheckBox>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QVBoxLayout>
 #include <QKeySequence>
 #include <QLineEdit>
 #include <QShortcut>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QCompleter>
+#include <QStringListModel>
 #include <QDateTime>
 #include <QActionGroup>
 #include <QDesktopServices>
@@ -52,6 +58,7 @@
 #include <QWebEngineDownloadRequest>
 #include <QWebEngineHistory>
 #include <QWebEngineProfile>
+#include <QWebEngineCookieStore>
 #include <QWebEngineSettings>
 #include <QWebEngineView>
 #include <QStatusBar>
@@ -116,6 +123,10 @@ void BrowserWindow::closeEvent(QCloseEvent *event)
 
 bool BrowserWindow::eventFilter(QObject *obj, QEvent *event)
 {
+    if (obj == m_shieldLabel && event->type() == QEvent::MouseButtonRelease) {
+        showBlockedDetails();
+        return true;
+    }
     if (obj == m_tabs->tabBar() && event->type() == QEvent::MouseButtonRelease) {
         auto *me = static_cast<QMouseEvent *>(event);
         if (me->button() == Qt::MiddleButton) {
@@ -135,6 +146,10 @@ void BrowserWindow::setupUi()
     m_tabs->setMovable(true);
     m_tabs->setDocumentMode(true);
     m_tabs->tabBar()->setExpanding(false);
+    // 标签过多时可滚动 + 省略号
+    m_tabs->tabBar()->setUsesScrollButtons(true);
+    m_tabs->setElideMode(Qt::ElideRight);
+    m_tabs->tabBar()->setContextMenuPolicy(Qt::CustomContextMenu);
     setCentralWidget(m_tabs);
 
     connect(m_tabs, &QTabWidget::currentChanged, this, &BrowserWindow::onTabChanged);
@@ -142,6 +157,10 @@ void BrowserWindow::setupUi()
 
     // 中键点击标签 → 关闭（与主流浏览器一致）
     m_tabs->tabBar()->installEventFilter(this);
+
+    // 右键标签 → 静音等
+    connect(m_tabs->tabBar(), &QTabBar::customContextMenuRequested,
+            this, &BrowserWindow::onTabBarContextMenu);
 
     m_progress = new QProgressBar(this);
     m_progress->setMaximumWidth(160);
@@ -175,6 +194,23 @@ void BrowserWindow::setupActions()
     m_urlBar->setPlaceholderText(QStringLiteral("搜索或输入网址"));
     m_urlBar->setMinimumWidth(400);
     navBar->addWidget(m_urlBar);
+
+    // 地址栏智能补全（按需重建 model，避免维护多个刷新点）
+    m_completer = new QCompleter(this);
+    m_completer->setCaseSensitivity(Qt::CaseInsensitive);
+    m_completer->setFilterMode(Qt::MatchContains);
+    m_completer->setCompletionMode(QCompleter::PopupCompletion);
+    m_urlBar->setCompleter(m_completer);
+    connect(m_urlBar, &QLineEdit::textEdited, this, &BrowserWindow::refreshUrlCompleter);
+
+    // 盾牌：显示当前站点拦截数
+    m_shieldLabel = new QLabel(this);
+    m_shieldLabel->setToolTip(QStringLiteral("本页拦截的广告/追踪请求"));
+    m_shieldLabel->setCursor(Qt::PointingHandCursor);
+    m_shieldLabel->setMinimumWidth(48);
+    m_shieldLabel->setText(QStringLiteral("🛡 0"));
+    m_shieldLabel->installEventFilter(this);
+    navBar->addWidget(m_shieldLabel);
 
     navBar->addSeparator();
     m_actNewTab = navBar->addAction(style()->standardIcon(QStyle::SP_FileDialogNewFolder), QString());
@@ -212,6 +248,7 @@ void BrowserWindow::setupActions()
     QAction *actPrint = mainMenu->addAction(QStringLiteral("打印…"));
     actPrint->setShortcut(QKeySequence::Print);
     QAction *actPdf = mainMenu->addAction(QStringLiteral("保存为 PDF…"));
+    QAction *actCapture = mainMenu->addAction(QStringLiteral("截图当前页…"));
     mainMenu->addSeparator();
 
     QMenu *themeMenu = mainMenu->addMenu(QStringLiteral("主题"));
@@ -247,6 +284,7 @@ void BrowserWindow::setupActions()
     mainMenu->addSeparator();
 
     QAction *actCheckUpdate = mainMenu->addAction(QStringLiteral("检查更新…"));
+    QAction *actClearData = mainMenu->addAction(QStringLiteral("清除浏览数据…"));
     m_actSettings = mainMenu->addAction(QStringLiteral("设置…"));
     QAction *actQuit = mainMenu->addAction(QStringLiteral("退出"));
     actQuit->setShortcut(QKeySequence(QStringLiteral("Ctrl+Q")));
@@ -274,6 +312,7 @@ void BrowserWindow::setupActions()
     connect(actFind, &QAction::triggered, this, &BrowserWindow::showFindBar);
     connect(actPrint, &QAction::triggered, this, &BrowserWindow::printPage);
     connect(actPdf, &QAction::triggered, this, &BrowserWindow::savePageAsPdf);
+    connect(actCapture, &QAction::triggered, this, &BrowserWindow::capturePage);
     connect(m_actThemeSystem, &QAction::triggered, this, [this]{ setThemeMode(QStringLiteral("system")); });
     connect(m_actThemeLight,  &QAction::triggered, this, [this]{ setThemeMode(QStringLiteral("light")); });
     connect(m_actThemeDark,   &QAction::triggered, this, [this]{ setThemeMode(QStringLiteral("dark")); });
@@ -283,6 +322,7 @@ void BrowserWindow::setupActions()
     connect(actToolbox, &QAction::triggered, this, &BrowserWindow::showToolbox);
     connect(actSync, &QAction::triggered, this, &BrowserWindow::showSyncDialog);
     connect(actCheckUpdate, &QAction::triggered, this, &BrowserWindow::checkForUpdates);
+    connect(actClearData, &QAction::triggered, this, &BrowserWindow::clearBrowsingData);
     connect(m_actSettings, &QAction::triggered, this, &BrowserWindow::showSettings);
     // ---- 阅读模式 / 标签栏 / 手势 ----
     m_actReader = mainMenu->addAction(QStringLiteral("阅读模式"));
@@ -357,6 +397,7 @@ void BrowserWindow::setupActions()
     addShortcut(QKeySequence(QStringLiteral("Ctrl+0")), [this]{ zoomReset(); });
 
     addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+N")), [this]{ onNewPrivateTab(); });
+    addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+T")), [this]{ onReopenClosedTab(); });
 
     // 跟随系统时，响应系统主题变化
     connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
@@ -368,6 +409,16 @@ void BrowserWindow::setupActions()
     // ---- 打印 / 导出 PDF ----
     addShortcut(QKeySequence::Print, [this]{ printPage(); });  // Ctrl+P
     addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+P")), [this]{ savePageAsPdf(); });
+
+    // ---- 盾牌：拦截计数 ----
+    connect(m_adBlocker, &AdBlocker::blockedCountChanged, this,
+            [this](const QString &host, int count) {
+                auto *v = currentView();
+                if (v && v->url().host().compare(host, Qt::CaseInsensitive) == 0)
+                    m_shieldLabel->setText(QStringLiteral("🛡 %1").arg(count));
+            });
+    refreshShieldForCurrent();
+    connect(m_tabs, &QTabWidget::currentChanged, this, [this]{ refreshShieldForCurrent(); });
 }
 
 // ===================== 书签 =====================
@@ -1143,6 +1194,23 @@ WebView *BrowserWindow::createTabView(bool privateMode)
                 dlg.exec();
             });
 
+    // 划词工具栏 -> 解释 / 翻译 / 搜索
+    connect(view, &WebView::selectionActionRequested, this,
+            [this](const QString &action, const QString &text) {
+                if (action == QStringLiteral("search")) {
+                    const QString tmpl = SettingsDialog::searchUrlTemplate(SettingsDialog::searchEngine());
+                    const QString query = QString::fromUtf8(QUrl::toPercentEncoding(text));
+                    createTab(QUrl(tmpl.arg(query)), true);
+                    return;
+                }
+                const QString prompt = (action == QStringLiteral("translate"))
+                    ? QStringLiteral("请把下面的内容翻译成简体中文（若已是中文则翻译成英文）：\n\n") + text
+                    : QStringLiteral("请用简体中文解释下面的内容：\n\n") + text;
+                AiDialog dlg(this);
+                dlg.askWithPrompt(prompt);
+                dlg.exec();
+            });
+
     // 右键菜单 -> 用其他搜索引擎搜索选中文字
     connect(view, &WebView::searchRequested, this,
             [this](const QString &engine, const QString &text) {
@@ -1203,12 +1271,54 @@ void BrowserWindow::onNewTab()
 void BrowserWindow::onCloseTab(int index)
 {
     QWidget *w = m_tabs->widget(index);
+    if (auto *v = qobject_cast<WebView *>(w)) {
+        const QUrl u = v->url();
+        // 不记录空白页与隐私标签
+        if (u.isValid() && !u.isEmpty()
+            && !v->property("breezePrivate").toBool()) {
+            m_closedTabs.prepend(u);
+            while (m_closedTabs.size() > 20)
+                m_closedTabs.removeLast();
+        }
+    }
     m_tabs->removeTab(index);
     if (w)
         w->deleteLater();
 
     if (m_tabs->count() == 0)
         onNewTab();
+}
+
+void BrowserWindow::onReopenClosedTab()
+{
+    if (m_closedTabs.isEmpty()) {
+        statusBar()->showMessage(QStringLiteral("没有可恢复的标签"), 2000);
+        return;
+    }
+    const QUrl u = m_closedTabs.takeFirst();
+    createTab(u, true);
+}
+
+void BrowserWindow::onTabBarContextMenu(const QPoint &pos)
+{
+    const int index = m_tabs->tabBar()->tabAt(pos);
+    if (index < 0)
+        return;
+    auto *view = qobject_cast<WebView *>(m_tabs->widget(index));
+
+    QMenu menu(this);
+    if (view) {
+        const bool muted = view->page()->isAudioMuted();
+        QAction *actMute = menu.addAction(muted ? QStringLiteral("取消静音")
+                                                : QStringLiteral("静音此标签"));
+        connect(actMute, &QAction::triggered, this, [view, muted]() {
+            view->page()->setAudioMuted(!muted);
+        });
+    }
+    QAction *actClose = menu.addAction(QStringLiteral("关闭标签"));
+    connect(actClose, &QAction::triggered, this, [this, index]() { onCloseTab(index); });
+
+    menu.exec(m_tabs->tabBar()->mapToGlobal(pos));
 }
 
 void BrowserWindow::onTabChanged(int index)
@@ -1277,6 +1387,48 @@ QUrl BrowserWindow::normalizedUrl(const QString &text) const
     return QUrl();
 }
 
+void BrowserWindow::refreshUrlCompleter(const QString &prefix)
+{
+    if (prefix.trimmed().isEmpty())
+        return;
+
+    const QString needle = prefix.trimmed();
+    QStringList items;
+    QSet<QString> seen;
+
+    auto add = [&](const QString &title, const QUrl &url) {
+        if (!url.isValid())
+            return;
+        const QString key = url.toString();
+        if (seen.contains(key))
+            return;
+        seen.insert(key);
+        const QString label = title.isEmpty()
+            ? key
+            : QStringLiteral("%1 — %2").arg(title, key);
+        items << label;
+    };
+
+    int n = 0;
+    for (auto it = m_history.crbegin(); it != m_history.crend() && n < 300; ++it, ++n) {
+        if (it->url.toString().contains(needle, Qt::CaseInsensitive)
+            || it->title.contains(needle, Qt::CaseInsensitive))
+            add(it->title, it->url);
+    }
+    n = 0;
+    for (const Bookmark &b : m_bookmarks) {
+        if (n++ >= 300) break;
+        if (b.url.toString().contains(needle, Qt::CaseInsensitive)
+            || b.title.contains(needle, Qt::CaseInsensitive))
+            add(b.title, b.url);
+    }
+
+    if (!m_completer)
+        return;
+    auto *model = new QStringListModel(items, m_completer);
+    m_completer->setModel(model);
+}
+
 void BrowserWindow::checkForUpdates()
 {
     if (!m_updateManager)
@@ -1307,6 +1459,86 @@ void BrowserWindow::checkForUpdates()
     }
 
     m_updateManager->checkForUpdates();
+}
+
+void BrowserWindow::refreshShieldForCurrent()
+{
+    if (!m_shieldLabel || !m_adBlocker)
+        return;
+    auto *v = currentView();
+    if (!v) {
+        m_shieldLabel->setText(QStringLiteral("🛡 0"));
+        return;
+    }
+    const QString host = v->url().host().toLower();
+    m_shieldLabel->setText(QStringLiteral("🛡 %1").arg(m_adBlocker->blockedCountForHost(host)));
+}
+
+void BrowserWindow::showBlockedDetails()
+{
+    auto *v = currentView();
+    if (!v || !m_adBlocker)
+        return;
+    const QString host = v->url().host().toLower();
+    const QStringList urls = m_adBlocker->blockedUrlsForHost(host);
+    if (urls.isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("拦截详情"),
+            QStringLiteral("当前站点尚未拦截任何请求。"));
+        return;
+    }
+    QMessageBox::information(this, QStringLiteral("拦截详情"),
+        QStringLiteral("已在 %1 拦截 %2 条请求：\n\n%3")
+            .arg(host)
+            .arg(urls.size())
+            .arg(urls.mid(0, 30).join(QLatin1Char('\n'))));
+}
+
+void BrowserWindow::clearBrowsingData()
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("清除浏览数据"));
+    auto *v = new QVBoxLayout(&dlg);
+
+    auto *cbHistory = new QCheckBox(QStringLiteral("历史记录"), &dlg);
+    auto *cbCache   = new QCheckBox(QStringLiteral("缓存"), &dlg);
+    auto *cbCookies = new QCheckBox(QStringLiteral("Cookie 与站点数据"), &dlg);
+    auto *cbDown    = new QCheckBox(QStringLiteral("下载记录"), &dlg);
+    cbHistory->setChecked(true);
+    cbCache->setChecked(true);
+    v->addWidget(cbHistory);
+    v->addWidget(cbCache);
+    v->addWidget(cbCookies);
+    v->addWidget(cbDown);
+
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    v->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    if (cbHistory->isChecked()) {
+        m_history.clear();
+        saveHistory();
+        if (m_historyDialog)
+            m_historyDialog->setEntries(m_history);
+    }
+    if (cbCache->isChecked()) {
+        auto *profile = QWebEngineProfile::defaultProfile();
+        profile->clearHttpCache();
+        profile->clearAllVisitedLinks();
+    }
+    if (cbCookies->isChecked()) {
+        QWebEngineProfile::defaultProfile()->cookieStore()->deleteAllCookies();
+    }
+    if (cbDown->isChecked()) {
+        const QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+            + QStringLiteral("/downloads.json");
+        QFile::remove(path);
+    }
+
+    statusBar()->showMessage(QStringLiteral("已清除所选浏览数据"), 3000);
 }
 
 void BrowserWindow::showSettings()
@@ -1575,6 +1807,10 @@ void BrowserWindow::onLoadFinished(bool ok)
     if (view)
         view->installHoverWatcher();
 
+    // 安装划词工具栏
+    if (view)
+        view->installSelectionToolbar();
+
     // 按域名恢复页面缩放
     if (view)
         applySavedZoom(view);
@@ -1688,6 +1924,34 @@ void BrowserWindow::savePageAsPdf()
     statusBar()->showMessage(QStringLiteral("已导出 PDF：%1").arg(path), 3000);
 }
 
+
+void BrowserWindow::capturePage()
+{
+    auto *v = currentView();
+    if (!v)
+        return;
+
+    const QPixmap shot = v->grab();
+    if (shot.isNull()) {
+        QMessageBox::warning(this, QStringLiteral("截图失败"),
+                             QStringLiteral("无法捕获当前页面。"));
+        return;
+    }
+
+    const QString path = QFileDialog::getSaveFileName(
+        this, QStringLiteral("保存截图"),
+        QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
+            + QStringLiteral("/breeze-shot.png"),
+        QStringLiteral("PNG 图片 (*.png)"));
+    if (path.isEmpty())
+        return;
+
+    if (shot.save(path, "PNG"))
+        statusBar()->showMessage(QStringLiteral("截图已保存：%1").arg(path), 3000);
+    else
+        QMessageBox::warning(this, QStringLiteral("保存失败"),
+                             QStringLiteral("无法写入图片文件。"));
+}
 
 void BrowserWindow::zoomIn()
 {
