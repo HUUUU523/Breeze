@@ -2835,7 +2835,16 @@ void BrowserWindow::updateTabTitle(WebView *view)
     if (m_pinnedTabs.contains(view))
         title = QStringLiteral("📌 ") + title;
     m_tabs->setTabText(index, title);
-    m_tabs->setTabToolTip(index, view->title());
+    {
+        const QString t = view->title();
+        const QString u = view->url().toString();
+        QString tip;
+        if (!t.isEmpty())
+            tip = t;
+        if (!u.isEmpty())
+            tip += (tip.isEmpty() ? QString() : QStringLiteral("\n")) + u;
+        m_tabs->setTabToolTip(index, tip);
+    }
 
     if (view == currentView()) {
         setWindowTitle(view->title().isEmpty()
