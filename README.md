@@ -2,7 +2,7 @@
 
 基于 **Qt6 + Qt WebEngine** 的轻量多标签浏览器，C++ 编写，界面极简。
 
-![version](https://img.shields.io/badge/version-2.1.0-blue)
+![version](https://img.shields.io/badge/version-2.1.1-blue)
 ![platform](https://img.shields.io/badge/platform-Windows%20x64-lightgrey)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
