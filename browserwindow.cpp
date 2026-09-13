@@ -2433,6 +2433,14 @@ void BrowserWindow::saveSession() const
 
 void BrowserWindow::restoreSession()
 {
+    // 启动行为：1=打开主页（不走会话恢复）
+    if (SettingsDialog::startupBehavior() == 1) {
+        WebView *v = createTab(QUrl(), true);
+        if (v)
+            v->setHtml(dialsHtml());
+        return;
+    }
+
     QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
     const QStringList urls = s.value(QStringLiteral("session/urls")).toStringList();
 

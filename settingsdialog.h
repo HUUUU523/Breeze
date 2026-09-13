@@ -39,6 +39,10 @@ public:
     static int     downloadSpeedLimit();
     static void    setDownloadSpeedLimit(int kbPerSec);
 
+    // 启动行为：0=恢复上次会话，1=打开主页
+    static int     startupBehavior();
+    static void    setStartupBehavior(int mode);
+
     // 搜索引擎名 -> 查询 URL 模板（含 %1 占位）
     static QString searchUrlTemplate(const QString &engineName);
 
@@ -55,6 +59,7 @@ private:
     QLineEdit *m_proxyHostEdit  = nullptr;
     QSpinBox  *m_proxyPortSpin  = nullptr;
     QSpinBox  *m_speedLimitSpin = nullptr;
+    QComboBox *m_startupCombo   = nullptr;
     QLineEdit *m_proxyUserEdit  = nullptr;
     QLineEdit *m_proxyPassEdit  = nullptr;
 };

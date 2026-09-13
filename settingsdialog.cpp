@@ -38,6 +38,11 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_historyCheck = new QCheckBox(QStringLiteral("记录浏览历史"), this);
     form->addRow(QString(), m_historyCheck);
 
+    m_startupCombo = new QComboBox(this);
+    m_startupCombo->addItem(QStringLiteral("恢复上次会话"), 0);
+    m_startupCombo->addItem(QStringLiteral("打开主页"), 1);
+    form->addRow(QStringLiteral("启动时："), m_startupCombo);
+
     layout->addLayout(form);
 
     // ---- 代理 ----
@@ -87,6 +92,7 @@ void SettingsDialog::load()
     m_homeEdit->setText(homePage());
     m_engineCombo->setCurrentText(searchEngine());
     m_historyCheck->setChecked(recordHistory());
+    m_startupCombo->setCurrentIndex(startupBehavior() == 1 ? 1 : 0);
 
     const QString pt = proxyType();
     const int idx = m_proxyTypeCombo->findData(pt);
@@ -103,6 +109,7 @@ void SettingsDialog::onAccepted()
     setHomePage(m_homeEdit->text().trimmed());
     setSearchEngine(m_engineCombo->currentText());
     setRecordHistory(m_historyCheck->isChecked());
+    setStartupBehavior(m_startupCombo->currentData().toInt());
     setDownloadSpeedLimit(m_speedLimitSpin->value());
     setProxy(m_proxyTypeCombo->currentData().toString(),
              m_proxyHostEdit->text().trimmed(),
@@ -214,6 +221,18 @@ void SettingsDialog::setDownloadSpeedLimit(int kbPerSec)
 {
     QSettings s(kOrg, kApp);
     s.setValue(QStringLiteral("download/speedLimitKB"), qMax(0, kbPerSec));
+}
+
+int SettingsDialog::startupBehavior()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("startup/behavior"), 0).toInt();
+}
+
+void SettingsDialog::setStartupBehavior(int mode)
+{
+    QSettings s(kOrg, kApp);
+    s.setValue(QStringLiteral("startup/behavior"), mode);
 }
 
 void SettingsDialog::applyProxy()
