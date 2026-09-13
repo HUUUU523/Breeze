@@ -290,6 +290,7 @@ void BrowserWindow::setupActions()
 
     QAction *actAiChat = mainMenu->addAction(QStringLiteral("AI 对话…"));
     QAction *actAiSummary = mainMenu->addAction(QStringLiteral("AI 总结当前页"));
+    QAction *actAiTranslate = mainMenu->addAction(QStringLiteral("AI 翻译当前页"));
     QAction *actAiSidebar = mainMenu->addAction(QStringLiteral("AI 侧边栏"));
     QAction *actBmSidebar = mainMenu->addAction(QStringLiteral("书签/历史侧边栏"));
     QAction *actPageQa = mainMenu->addAction(QStringLiteral("网页问答…"));
@@ -345,6 +346,7 @@ void BrowserWindow::setupActions()
     connect(m_actThemeDark,   &QAction::triggered, this, [this]{ setThemeMode(QStringLiteral("dark")); });
     connect(actAiChat, &QAction::triggered, this, &BrowserWindow::showAiChat);
     connect(actAiSummary, &QAction::triggered, this, &BrowserWindow::aiSummarizePage);
+    connect(actAiTranslate, &QAction::triggered, this, &BrowserWindow::aiTranslatePage);
     connect(actAiSidebar, &QAction::triggered, this, &BrowserWindow::toggleAiSidebar);
     connect(actBmSidebar, &QAction::triggered, this, &BrowserWindow::toggleBookmarkSidebar);
     connect(actPageQa, &QAction::triggered, this, [this]() {
@@ -2033,6 +2035,39 @@ void BrowserWindow::aiSummarizePage()
         AiDialog dlg(this);
         dlg.askWithPrompt(
             QStringLiteral("请用简体中文总结以下网页内容，先给一句话概述，再列关键要点：\n\n")
+            + text);
+        dlg.exec();
+    });
+}
+
+void BrowserWindow::aiTranslatePage()
+{
+    WebView *v = currentView();
+    if (!v) {
+        QMessageBox::information(this, QStringLiteral("AI"),
+                                 QStringLiteral("没有可翻译的页面。"));
+        return;
+    }
+
+    // 提取正文
+    const QString script = QStringLiteral(
+        "(function(){"
+        "var t=document.body?document.body.innerText:'';"
+        "t=t.replace(/\\s+/g,' ').trim();"
+        "return t.slice(0,8000);"
+        "})();");
+
+    v->page()->runJavaScript(script, [this](const QVariant &result) {
+        const QString text = result.toString().trimmed();
+        if (text.isEmpty()) {
+            QMessageBox::information(this, QStringLiteral("AI"),
+                                     QStringLiteral("页面没有可提取的正文。"));
+            return;
+        }
+        AiDialog dlg(this);
+        dlg.askWithPrompt(
+            QStringLiteral("请把以下网页内容翻译成简体中文（若原文已是中文则翻译成英文）。"
+                           "保留段落结构，直接输出译文：\n\n")
             + text);
         dlg.exec();
     });

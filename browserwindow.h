@@ -136,6 +136,7 @@ private slots:
     void injectExtensionScripts(WebView *view, const QUrl &url); // 扩展 content scripts
     void showAiChat();
     void aiSummarizePage();
+    void aiTranslatePage();      // 用 AI 翻译当前页正文
     // ---- 广告拦截 ----
     void toggleAdBlock(bool enabled);
 
