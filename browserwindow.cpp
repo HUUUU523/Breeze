@@ -206,6 +206,12 @@ void BrowserWindow::setupActions()
 
     navBar->addSeparator();
 
+    // 安全状态指示（锁图标）
+    m_securityLabel = new QLabel(this);
+    m_securityLabel->setToolTip(QStringLiteral("连接安全性"));
+    m_securityLabel->setMinimumWidth(20);
+    navBar->addWidget(m_securityLabel);
+
     // 地址栏
     m_urlBar = new QLineEdit(this);
     m_urlBar->setClearButtonEnabled(true);
@@ -2788,6 +2794,21 @@ void BrowserWindow::updateTabUrl(WebView *view, const QUrl &url)
         m_urlBar->setText(url.toString());
         m_urlBar->setCursorPosition(0);
         updateNavButtons();
+
+        // 安全状态指示
+        if (m_securityLabel) {
+            const QString scheme = url.scheme();
+            if (scheme == QStringLiteral("https")) {
+                m_securityLabel->setText(QStringLiteral("🔒"));
+                m_securityLabel->setToolTip(QStringLiteral("安全连接（HTTPS）"));
+            } else if (scheme == QStringLiteral("http")) {
+                m_securityLabel->setText(QStringLiteral("⚠"));
+                m_securityLabel->setToolTip(QStringLiteral("不安全连接（HTTP）"));
+            } else {
+                m_securityLabel->clear();
+                m_securityLabel->setToolTip(QString());
+            }
+        }
     }
 }
 

@@ -202,6 +202,7 @@ private:
     QCompleter   *m_completer   = nullptr;
     QProgressBar *m_progress    = nullptr;
     QLabel       *m_shieldLabel = nullptr;
+    QLabel       *m_securityLabel = nullptr;
     QToolBar     *m_bookmarkBar = nullptr;
     QToolBar     *m_findBar     = nullptr;
     QLineEdit    *m_findEdit    = nullptr;
