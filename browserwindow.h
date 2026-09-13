@@ -58,6 +58,7 @@ private slots:
     void onTabChanged(int index);
     void onReopenClosedTab();              // Ctrl+Shift+T
     void onTabBarContextMenu(const QPoint &pos);  // 右键标签：静音等
+    void showTabSwitcher();                // Ctrl+Shift+A 标签搜索
     void showBlockedDetails();             // 盾牌点击：查看已拦截列表
     void togglePinTab(int index);          // 固定/取消固定标签
 

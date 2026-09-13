@@ -25,6 +25,7 @@
 #include <QVBoxLayout>
 #include <QKeySequence>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QShortcut>
 #include <QApplication>
 #include <QCloseEvent>
@@ -465,6 +466,7 @@ void BrowserWindow::setupActions()
 
     addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+N")), [this]{ onNewPrivateTab(); });
     addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+T")), [this]{ onReopenClosedTab(); });
+    addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+A")), [this]{ showTabSwitcher(); });
 
     // 跟随系统时，响应系统主题变化
     connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
@@ -1503,6 +1505,60 @@ void BrowserWindow::togglePinTab(int index)
         m_tabs->setTabText(index, QStringLiteral("📌 ") + title);
         statusBar()->showMessage(QStringLiteral("已固定标签"), 1500);
     }
+}
+
+void BrowserWindow::showTabSwitcher()
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("切换标签页"));
+    dlg.resize(480, 380);
+
+    auto *layout = new QVBoxLayout(&dlg);
+    auto *edit = new QLineEdit(&dlg);
+    edit->setPlaceholderText(QStringLiteral("输入标题或网址筛选…"));
+    edit->setClearButtonEnabled(true);
+    layout->addWidget(edit);
+
+    auto *list = new QListWidget(&dlg);
+    layout->addWidget(list, 1);
+
+    // 填充所有标签
+    auto fill = [this, list](const QString &filter) {
+        list->clear();
+        for (int i = 0; i < m_tabs->count(); ++i) {
+            auto *v = qobject_cast<WebView *>(m_tabs->widget(i));
+            if (!v) continue;
+            const QString title = v->title().isEmpty()
+                ? QStringLiteral("新标签页") : v->title();
+            const QString url = v->url().toString();
+            if (!filter.isEmpty()
+                && !title.contains(filter, Qt::CaseInsensitive)
+                && !url.contains(filter, Qt::CaseInsensitive))
+                continue;
+            auto *item = new QListWidgetItem(
+                QStringLiteral("%1  —  %2").arg(title, url));
+            item->setData(Qt::UserRole, i);
+            list->addItem(item);
+        }
+        if (list->count() > 0)
+            list->setCurrentRow(0);
+    };
+
+    fill(QString());
+
+    connect(edit, &QLineEdit::textChanged, &dlg, [fill](const QString &t) { fill(t); });
+
+    auto activate = [&dlg, list]() {
+        auto *item = list->currentItem();
+        if (item)
+            dlg.done(item->data(Qt::UserRole).toInt() + 1);  // +1 避免 0 与 Rejected 冲突
+    };
+    connect(edit, &QLineEdit::returnPressed, &dlg, activate);
+    connect(list, &QListWidget::itemActivated, &dlg, [&dlg, activate](QListWidgetItem*) { activate(); });
+
+    const int ret = dlg.exec();
+    if (ret > 0)
+        m_tabs->setCurrentIndex(ret - 1);
 }
 
 void BrowserWindow::onTabChanged(int index)
