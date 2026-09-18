@@ -4,6 +4,8 @@
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QMessageBox>
+#include <QPushButton>
 #include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
@@ -85,10 +87,25 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     layout->addWidget(new QLabel(QStringLiteral("提示：主页与搜索引擎修改后立即生效。"), this));
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    auto *resetBtn = buttons->addButton(QStringLiteral("恢复默认"),
+                                        QDialogButtonBox::ResetRole);
     layout->addWidget(buttons);
 
     connect(buttons, &QDialogButtonBox::accepted, this, &SettingsDialog::onAccepted);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    connect(resetBtn, &QPushButton::clicked, this, [this]() {
+        if (QMessageBox::question(this, QStringLiteral("恢复默认"),
+                QStringLiteral("将所有设置恢复为默认值？")) != QMessageBox::Yes)
+            return;
+        setHomePage(QStringLiteral("https://www.bing.com"));
+        setSearchEngine(QStringLiteral("Bing"));
+        setRecordHistory(true);
+        setDownloadSpeedLimit(0);
+        setProxy(QStringLiteral("none"), QString(), 0, QString(), QString());
+        setStartupBehavior(0);
+        setNewTabBehavior(0);
+        load();   // 刷新界面
+    });
 
     load();
 }
