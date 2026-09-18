@@ -261,6 +261,7 @@ void BrowserWindow::setupActions()
     m_actShowBookmarkBar = mainMenu->addAction(QStringLiteral("显示书签栏"));
     m_actShowBookmarkBar->setCheckable(true);
     m_actShowBookmarkBar->setChecked(false);
+    m_actShowBookmarkBar->setShortcut(QKeySequence(QStringLiteral("Ctrl+B")));
 
     m_actHistory   = mainMenu->addAction(QStringLiteral("历史记录…"));
     QAction *actImportHis = mainMenu->addAction(QStringLiteral("导入历史（JSON）…"));
