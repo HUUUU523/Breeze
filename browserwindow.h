@@ -48,7 +48,9 @@ signals:
     void middleClicked(const QUrl &url);
 protected:
     void mouseReleaseEvent(QMouseEvent *e) override {
-        if (e->button() == Qt::MiddleButton) {
+        if (e->button() == Qt::MiddleButton
+            || (e->button() == Qt::LeftButton
+                && (e->modifiers() & Qt::ControlModifier))) {
             emit middleClicked(m_url);
             e->accept();
             return;
