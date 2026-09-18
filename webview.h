@@ -71,6 +71,9 @@ signals:
     // 划词工具栏动作
     void selectionActionRequested(const QString &action, const QString &text);
 
+    // 请求在新标签打开某 URL
+    void newTabRequested(const QUrl &url, bool switchToTab);
+
 
 protected:
     QWebEngineView *createWindow(QWebEnginePage::WebWindowType type) override;

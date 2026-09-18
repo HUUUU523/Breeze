@@ -6,6 +6,7 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QWebEngineCertificateError>
+#include <QWebEngineContextMenuRequest>
 #include <QWebEngineHistory>
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
@@ -218,10 +219,16 @@ QWebEngineView *WebView::createWindow(QWebEnginePage::WebWindowType type)
 
 void WebView::contextMenuEvent(QContextMenuEvent *event)
 {
+    // 记录本次右键的上下文（图片/链接地址）
+    const QUrl mediaUrl = lastContextMenuRequest()
+        ? lastContextMenuRequest()->mediaUrl() : QUrl();
+    const QUrl linkUrl = lastContextMenuRequest()
+        ? lastContextMenuRequest()->linkUrl() : QUrl();
+
     // 先异步取选中文字，再弹菜单
     page()->runJavaScript(
         QStringLiteral("window.getSelection().toString()"),
-        [this, event](const QVariant &result) {
+        [this, event, mediaUrl, linkUrl](const QVariant &result) {
             const QString selectedText = result.toString().trimmed();
 
             QMenu menu;
@@ -263,6 +270,22 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
                 menu.addSeparator();
             }
 
+            if (linkUrl.isValid() && !linkUrl.isEmpty()) {
+                menu.addAction(QStringLiteral("复制链接地址"), this, [linkUrl]() {
+                    QApplication::clipboard()->setText(linkUrl.toString());
+                });
+                menu.addAction(QStringLiteral("在新标签打开链接"), this, [this, linkUrl]() {
+                    emit newTabRequested(linkUrl, true);
+                });
+            }
+            if (mediaUrl.isValid() && !mediaUrl.isEmpty()) {
+                menu.addAction(QStringLiteral("复制图片地址"), this, [mediaUrl]() {
+                    QApplication::clipboard()->setText(mediaUrl.toString());
+                });
+                menu.addAction(QStringLiteral("在新标签打开图片"), this, [this, mediaUrl]() {
+                    emit newTabRequested(mediaUrl, true);
+                });
+            }
             menu.addAction(QStringLiteral("复制页面地址"), this, [this]() {
                 QApplication::clipboard()->setText(url().toString());
             });

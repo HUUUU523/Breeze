@@ -1453,6 +1453,12 @@ WebView *BrowserWindow::createTabView(bool privateMode)
                 dlg.exec();
             });
 
+    // 右键菜单 -> 在新标签打开链接/图片
+    connect(view, &WebView::newTabRequested, this,
+            [this](const QUrl &url, bool switchToTab) {
+                createTab(url, switchToTab);
+            });
+
     // 划词工具栏 -> 解释 / 翻译 / 搜索
     connect(view, &WebView::selectionActionRequested, this,
             [this](const QString &action, const QString &text) {
