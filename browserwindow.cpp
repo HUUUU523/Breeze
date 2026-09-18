@@ -1608,6 +1608,13 @@ void BrowserWindow::onTabBarContextMenu(const QPoint &pos)
             createTab(view->url(), true);
         });
     }
+    QAction *actReloadAll = menu.addAction(QStringLiteral("重新加载所有标签"));
+    connect(actReloadAll, &QAction::triggered, this, [this]() {
+        for (int i = 0; i < m_tabs->count(); ++i) {
+            if (auto *v = qobject_cast<WebView *>(m_tabs->widget(i)))
+                v->reload();
+        }
+    });
     QAction *actClose = menu.addAction(QStringLiteral("关闭标签"));
     connect(actClose, &QAction::triggered, this, [this, index]() { onCloseTab(index); });
 
