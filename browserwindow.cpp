@@ -20,6 +20,7 @@
 
 #include <QAction>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QVBoxLayout>
@@ -1595,6 +1596,16 @@ void BrowserWindow::onTabBarContextMenu(const QPoint &pos)
                 setTabAutoRefresh(view, sec);
             });
         }
+    }
+    if (view) {
+        QAction *actCopyUrl = menu.addAction(QStringLiteral("复制标签地址"));
+        connect(actCopyUrl, &QAction::triggered, this, [view]() {
+            QApplication::clipboard()->setText(view->url().toString());
+        });
+        QAction *actDuplicate = menu.addAction(QStringLiteral("复制标签页"));
+        connect(actDuplicate, &QAction::triggered, this, [this, view]() {
+            createTab(view->url(), true);
+        });
     }
     QAction *actClose = menu.addAction(QStringLiteral("关闭标签"));
     connect(actClose, &QAction::triggered, this, [this, index]() { onCloseTab(index); });
