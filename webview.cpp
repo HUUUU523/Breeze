@@ -296,7 +296,8 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
                                 : t + QStringLiteral("\n") + url().toString());
             });
             menu.addAction(QStringLiteral("查看源代码"), this, [this]() {
-                setUrl(QUrl(QStringLiteral("view-source:") + url().toString()));
+                emit newTabRequested(
+                    QUrl(QStringLiteral("view-source:") + url().toString()), true);
             });
 
             connect(back, &QAction::triggered, this, &QWebEngineView::back);
