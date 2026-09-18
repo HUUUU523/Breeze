@@ -728,10 +728,17 @@ void BrowserWindow::addBookmarkAction(const Bookmark &b, QToolBar *bar)
     connect(btn, &QToolButton::customContextMenuRequested, this,
             [this, url, btn](const QPoint &pos) {
                 QMenu menu;
+                QAction *openNew = menu.addAction(QStringLiteral("在新标签页打开"));
+                QAction *openBg = menu.addAction(QStringLiteral("在后台标签页打开"));
+                menu.addSeparator();
                 QAction *edit = menu.addAction(QStringLiteral("编辑书签…"));
                 QAction *del = menu.addAction(QStringLiteral("删除书签"));
                 QAction *chosen = menu.exec(btn->mapToGlobal(pos));
-                if (chosen == edit)
+                if (chosen == openNew)
+                    createTab(url, true);
+                else if (chosen == openBg)
+                    createTab(url, false);
+                else if (chosen == edit)
                     editBookmark(url);
                 else if (chosen == del)
                     removeBookmark(url);
