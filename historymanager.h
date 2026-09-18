@@ -37,6 +37,7 @@ private slots:
     void onItemActivated();
     void onClearClicked();
     void onDeleteSelected();
+    void onContextMenu(const QPoint &pos);
 
 private:
     void rebuild();

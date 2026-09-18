@@ -1,5 +1,9 @@
 #include "historymanager.h"
 
+#include <QApplication>
+#include <QClipboard>
+#include <QMenu>
+
 #include <QBrush>
 #include <QColor>
 #include <QDate>
@@ -44,6 +48,9 @@ HistoryDialog::HistoryDialog(QWidget *parent)
 
     connect(m_filter, &QLineEdit::textChanged, this, &HistoryDialog::onFilterChanged);
     connect(m_list, &QListWidget::itemActivated, this, &HistoryDialog::onItemActivated);
+    m_list->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_list, &QListWidget::customContextMenuRequested,
+            this, &HistoryDialog::onContextMenu);
     connect(delBtn, &QPushButton::clicked, this, &HistoryDialog::onDeleteSelected);
     connect(clearBtn, &QPushButton::clicked, this, &HistoryDialog::onClearClicked);
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::hide);
@@ -116,6 +123,30 @@ void HistoryDialog::rebuild()
 
     // 标题显示总条数
     setWindowTitle(QStringLiteral("历史记录（%1 条） - Breeze").arg(m_entries.size()));
+}
+
+void HistoryDialog::onContextMenu(const QPoint &pos)
+{
+    auto *item = m_list->itemAt(pos);
+    if (!item)
+        return;
+    const QString stored = item->data(Qt::UserRole).toString();
+    if (stored.isEmpty())
+        return;   // 分组标题
+    const QUrl url(stored);
+
+    m_list->setCurrentItem(item);
+    QMenu menu(this);
+    QAction *open = menu.addAction(QStringLiteral("打开"));
+    QAction *copy = menu.addAction(QStringLiteral("复制地址"));
+    QAction *del  = menu.addAction(QStringLiteral("删除"));
+    QAction *chosen = menu.exec(m_list->mapToGlobal(pos));
+    if (chosen == open)
+        emit openUrlRequested(url);
+    else if (chosen == copy)
+        QApplication::clipboard()->setText(url.toString());
+    else if (chosen == del)
+        onDeleteSelected();
 }
 
 void HistoryDialog::onItemActivated()
