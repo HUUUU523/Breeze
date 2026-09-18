@@ -10,6 +10,7 @@
 #include <QStyle>
 #include <QDesktopServices>
 #include <QDir>
+#include <QProcess>
 #include <QFile>
 #include <QFileInfo>
 #include <QHBoxLayout>
@@ -292,9 +293,18 @@ void DownloadManager::loadRecords()
         m_table->setItem(row, 2, new QTableWidgetItem(r.status));
 
         auto *openDirBtn = new QPushButton(QStringLiteral("文件夹"), m_table);
+        const QString fullPath = r.directory + QLatin1Char('/') + r.fileName;
         const QString dir = r.directory;
-        connect(openDirBtn, &QPushButton::clicked, this, [dir]() {
+        connect(openDirBtn, &QPushButton::clicked, this, [fullPath, dir]() {
+#ifdef Q_OS_WIN
+            if (QFile::exists(fullPath))
+                QProcess::startDetached(QStringLiteral("explorer.exe"),
+                                        { QStringLiteral("/select,"), QDir::toNativeSeparators(fullPath) });
+            else
+                QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
+#else
             QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
+#endif
         });
         m_table->setCellWidget(row, 3, openDirBtn);
     }
@@ -410,7 +420,14 @@ void DownloadManager::addDownload(QWebEngineDownloadRequest *download)
     });
 
     connect(openDirBtn, &QPushButton::clicked, this, [this, download]() {
+        const QString path = download->downloadDirectory()
+            + QLatin1Char('/') + download->downloadFileName();
+#ifdef Q_OS_WIN
+        QProcess::startDetached(QStringLiteral("explorer.exe"),
+                                { QStringLiteral("/select,"), QDir::toNativeSeparators(path) });
+#else
         QDesktopServices::openUrl(QUrl::fromLocalFile(download->downloadDirectory()));
+#endif
     });
 
     connect(download, &QWebEngineDownloadRequest::receivedBytesChanged, this,
