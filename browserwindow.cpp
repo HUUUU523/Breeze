@@ -68,6 +68,7 @@
 #include <QWebEngineFindTextResult>
 #include <QTabBar>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QEvent>
 #include <QTabWidget>
 #include <QToolBar>
@@ -154,6 +155,19 @@ bool BrowserWindow::eventFilter(QObject *obj, QEvent *event)
                 onCloseTab(idx);
             return true;
         }
+    }
+    // 标签栏滚轮 → 切换标签
+    if (obj == m_tabs->tabBar() && event->type() == QEvent::Wheel) {
+        auto *we = static_cast<QWheelEvent *>(event);
+        const int delta = we->angleDelta().y();
+        if (delta != 0 && m_tabs->count() > 1) {
+            const int cur = m_tabs->currentIndex();
+            const int next = delta > 0
+                ? (cur - 1 + m_tabs->count()) % m_tabs->count()
+                : (cur + 1) % m_tabs->count();
+            m_tabs->setCurrentIndex(next);
+        }
+        return true;
     }
     return QMainWindow::eventFilter(obj, event);
 }
