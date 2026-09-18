@@ -39,6 +39,10 @@ public:
     static int     downloadSpeedLimit();
     static void    setDownloadSpeedLimit(int kbPerSec);
 
+    // 默认下载目录（空 = 系统"下载"目录）
+    static QString downloadDirectory();
+    static void    setDownloadDirectory(const QString &dir);
+
     // 启动行为：0=恢复上次会话，1=打开主页
     static int     startupBehavior();
     static void    setStartupBehavior(int mode);
@@ -63,6 +67,7 @@ private:
     QLineEdit *m_proxyHostEdit  = nullptr;
     QSpinBox  *m_proxyPortSpin  = nullptr;
     QSpinBox  *m_speedLimitSpin = nullptr;
+    QLineEdit *m_downloadDirEdit = nullptr;
     QComboBox *m_startupCombo   = nullptr;
     QComboBox *m_newTabCombo    = nullptr;
     QLineEdit *m_proxyUserEdit  = nullptr;

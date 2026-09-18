@@ -930,10 +930,13 @@ void BrowserWindow::setupDownloads()
                     return;
                 }
 
-                // 使用系统"下载"目录，避免 Program Files 下无写权限
-                QString dir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
-                if (dir.isEmpty())
-                    dir = QDir::homePath();
+                // 优先使用设置里的下载目录；否则用系统"下载"目录
+                QString dir = SettingsDialog::downloadDirectory();
+                if (dir.isEmpty()) {
+                    dir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+                    if (dir.isEmpty())
+                        dir = QDir::homePath();
+                }
                 QDir().mkpath(dir);
                 download->setDownloadDirectory(dir);
                 download->accept();

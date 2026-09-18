@@ -3,7 +3,9 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QFileDialog>
 #include <QFormLayout>
+#include <QHBoxLayout>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QGroupBox>
@@ -82,6 +84,20 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_speedLimitSpin->setSuffix(QStringLiteral(" KB/s"));
     m_speedLimitSpin->setSpecialValueText(QStringLiteral("不限速"));
     dlForm->addRow(QStringLiteral("限速："), m_speedLimitSpin);
+
+    m_downloadDirEdit = new QLineEdit(dlBox);
+    m_downloadDirEdit->setPlaceholderText(QStringLiteral("（默认）系统下载目录"));
+    auto *browseBtn = new QPushButton(QStringLiteral("浏览…"), dlBox);
+    auto *dirRow = new QHBoxLayout;
+    dirRow->addWidget(m_downloadDirEdit, 1);
+    dirRow->addWidget(browseBtn);
+    dlForm->addRow(QStringLiteral("下载目录："), dirRow);
+    connect(browseBtn, &QPushButton::clicked, this, [this]() {
+        const QString dir = QFileDialog::getExistingDirectory(
+            this, QStringLiteral("选择下载目录"), m_downloadDirEdit->text());
+        if (!dir.isEmpty())
+            m_downloadDirEdit->setText(dir);
+    });
     layout->addWidget(dlBox);
 
     layout->addWidget(new QLabel(QStringLiteral("提示：主页与搜索引擎修改后立即生效。"), this));
@@ -126,6 +142,7 @@ void SettingsDialog::load()
     m_proxyUserEdit->setText(proxyUser());
     m_proxyPassEdit->setText(proxyPassword());
     m_speedLimitSpin->setValue(downloadSpeedLimit());
+    m_downloadDirEdit->setText(downloadDirectory());
 }
 
 void SettingsDialog::onAccepted()
@@ -136,6 +153,7 @@ void SettingsDialog::onAccepted()
     setStartupBehavior(m_startupCombo->currentData().toInt());
     setNewTabBehavior(m_newTabCombo->currentData().toInt());
     setDownloadSpeedLimit(m_speedLimitSpin->value());
+    setDownloadDirectory(m_downloadDirEdit->text());
     setProxy(m_proxyTypeCombo->currentData().toString(),
              m_proxyHostEdit->text().trimmed(),
              m_proxyPortSpin->value(),
@@ -246,6 +264,18 @@ void SettingsDialog::setDownloadSpeedLimit(int kbPerSec)
 {
     QSettings s(kOrg, kApp);
     s.setValue(QStringLiteral("download/speedLimitKB"), qMax(0, kbPerSec));
+}
+
+QString SettingsDialog::downloadDirectory()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("download/directory")).toString();
+}
+
+void SettingsDialog::setDownloadDirectory(const QString &dir)
+{
+    QSettings s(kOrg, kApp);
+    s.setValue(QStringLiteral("download/directory"), dir.trimmed());
 }
 
 int SettingsDialog::startupBehavior()
