@@ -665,7 +665,31 @@ void BrowserWindow::rebuildBookmarkBar()
     auto *addBtn = new QToolButton(m_bookmarkBar);
     addBtn->setText(QStringLiteral("＋"));
     addBtn->setToolTip(QStringLiteral("添加当前页到书签"));
-    connect(addBtn, &QToolButton::clicked, this, &BrowserWindow::addBookmarkForCurrentPage);
+    addBtn->setPopupMode(QToolButton::InstantPopup);
+    auto *addMenu = new QMenu(addBtn);
+    addMenu->addAction(QStringLiteral("添加书签（未分组）"), this,
+                       &BrowserWindow::addBookmarkForCurrentPage);
+    if (!groups.isEmpty()) {
+        addMenu->addSeparator();
+        for (const QString &g : groups) {
+            QAction *a = addMenu->addAction(QStringLiteral("添加到「%1」").arg(g));
+            connect(a, &QAction::triggered, this, [this, g]() {
+                WebView *v = currentView();
+                if (!v) return;
+                const QUrl url = v->url();
+                if (!url.isValid() || url.isEmpty()) return;
+                Bookmark b;
+                b.url = url;
+                b.title = v->title().isEmpty() ? url.host() : v->title();
+                b.group = g;
+                m_bookmarks.append(b);
+                saveBookmarks();
+                rebuildBookmarkBar();
+                statusBar()->showMessage(QStringLiteral("已添加到「%1」").arg(g), 2000);
+            });
+        }
+    }
+    addBtn->setMenu(addMenu);
     m_bookmarkBar->addWidget(addBtn);
 }
 
