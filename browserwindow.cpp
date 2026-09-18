@@ -730,6 +730,7 @@ void BrowserWindow::addBookmarkAction(const Bookmark &b, QToolBar *bar)
                 QMenu menu;
                 QAction *openNew = menu.addAction(QStringLiteral("在新标签页打开"));
                 QAction *openBg = menu.addAction(QStringLiteral("在后台标签页打开"));
+                QAction *copyUrl = menu.addAction(QStringLiteral("复制书签地址"));
                 menu.addSeparator();
                 QAction *edit = menu.addAction(QStringLiteral("编辑书签…"));
                 QAction *del = menu.addAction(QStringLiteral("删除书签"));
@@ -738,6 +739,8 @@ void BrowserWindow::addBookmarkAction(const Bookmark &b, QToolBar *bar)
                     createTab(url, true);
                 else if (chosen == openBg)
                     createTab(url, false);
+                else if (chosen == copyUrl)
+                    QApplication::clipboard()->setText(url.toString());
                 else if (chosen == edit)
                     editBookmark(url);
                 else if (chosen == del)
