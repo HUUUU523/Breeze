@@ -113,6 +113,9 @@ void HistoryDialog::rebuild()
         item->setToolTip(e.url.toString());
     }
     Q_UNUSED(groupHeaderNeeded);
+
+    // 标题显示总条数
+    setWindowTitle(QStringLiteral("历史记录（%1 条） - Breeze").arg(m_entries.size()));
 }
 
 void HistoryDialog::onItemActivated()
