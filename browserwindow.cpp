@@ -1629,6 +1629,16 @@ void BrowserWindow::onTabBarContextMenu(const QPoint &pos)
                 v->reload();
         }
     });
+    QAction *actCloseRight = menu.addAction(QStringLiteral("关闭右侧标签页"));
+    connect(actCloseRight, &QAction::triggered, this, [this, index]() {
+        for (int i = m_tabs->count() - 1; i > index; --i)
+            onCloseTab(i);
+    });
+    QAction *actCloseOthers = menu.addAction(QStringLiteral("关闭其他标签页"));
+    connect(actCloseOthers, &QAction::triggered, this, [this, index]() {
+        for (int i = m_tabs->count() - 1; i >= 0; --i)
+            if (i != index) onCloseTab(i);
+    });
     QAction *actClose = menu.addAction(QStringLiteral("关闭标签"));
     connect(actClose, &QAction::triggered, this, [this, index]() { onCloseTab(index); });
 
