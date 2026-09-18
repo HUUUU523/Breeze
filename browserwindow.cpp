@@ -1812,10 +1812,10 @@ QString BrowserWindow::dialsHtml() const
                  t.toHtmlEscaped());
     };
     for (const Bookmark &b : m_bookmarks) {
-        if (items.size() >= 12) break;
+        if (items.size() >= 24) break;
         addItem(b.title, b.url);
     }
-    for (auto it = m_history.crbegin(); it != m_history.crend() && items.size() < 12; ++it)
+    for (auto it = m_history.crbegin(); it != m_history.crend() && items.size() < 24; ++it)
         addItem(it->title, it->url);
 
     const QString tiles = items.isEmpty()
@@ -1829,7 +1829,7 @@ QString BrowserWindow::dialsHtml() const
   * { box-sizing: border-box; }
   body {
     margin: 0; min-height: 100vh; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
+    align-items: center; padding: 60px 0 40px;
     font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
     background: linear-gradient(135deg, #e8f4fd 0%%, #f5f2ea 100%%);
     color: #222;
