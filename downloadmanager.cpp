@@ -1,6 +1,8 @@
 #include "downloadmanager.h"
 
 #include <QApplication>
+#include <QElapsedTimer>
+#include <memory>
 #include <QSettings>
 #include <QThread>
 #include <QSystemTrayIcon>
@@ -199,10 +201,28 @@ void DownloadManager::startResumableDownload(const QUrl &url, const QString &sav
         }
     });
 
+    auto elapsed = std::make_shared<QElapsedTimer>();
+    elapsed->start();
     connect(reply, &QNetworkReply::downloadProgress, this,
-            [this, reply, bar, existing](qint64 recv, qint64 total) {
+            [this, reply, bar, existing, row, elapsed](qint64 recv, qint64 total) {
                 if (total > 0)
                     bar->setValue(static_cast<int>((existing + recv) * 100 / (existing + total)));
+                // 状态列显示速度
+                const qint64 ms = elapsed->elapsed();
+                if (ms > 500 && recv > 0) {
+                    const double kbPerSec = double(recv) / (ms / 1000.0) / 1024.0;
+                    QString speed;
+                    if (kbPerSec >= 1024)
+                        speed = QStringLiteral("%1 MB/s").arg(kbPerSec / 1024, 0, 'f', 1);
+                    else
+                        speed = QStringLiteral("%1 KB/s").arg(kbPerSec, 0, 'f', 0);
+                    if (auto *item = m_table->item(row, 2)) {
+                        if (item->text() == QStringLiteral("下载中")
+                            || item->text() == QStringLiteral("续传中")
+                            || item->text().contains(QStringLiteral("/s")))
+                            item->setText(speed);
+                    }
+                }
             });
 
     connect(reply, &QNetworkReply::finished, this,
