@@ -657,6 +657,16 @@ void BrowserWindow::rebuildBookmarkBar()
         btn->setPopupMode(QToolButton::InstantPopup);
         m_bookmarkBar->addWidget(btn);
     }
+
+    // 右侧固定"添加当前页"按钮
+    auto *spacer = new QWidget(m_bookmarkBar);
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    m_bookmarkBar->addWidget(spacer);
+    auto *addBtn = new QToolButton(m_bookmarkBar);
+    addBtn->setText(QStringLiteral("＋"));
+    addBtn->setToolTip(QStringLiteral("添加当前页到书签"));
+    connect(addBtn, &QToolButton::clicked, this, &BrowserWindow::addBookmarkForCurrentPage);
+    m_bookmarkBar->addWidget(addBtn);
 }
 
 void BrowserWindow::addBookmarkAction(const Bookmark &b, QToolBar *bar)
