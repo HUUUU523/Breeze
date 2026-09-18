@@ -127,6 +127,10 @@ void BookmarkManager::rebuild()
         }
         groupItem->setExpanded(true);
     }
+
+    // 标题显示条数
+    const int total = m_bookmarks ? m_bookmarks->size() : 0;
+    setWindowTitle(QStringLiteral("书签管理（%1 条） - Breeze").arg(total));
 }
 
 void BookmarkManager::onFilterChanged(const QString &text)
