@@ -231,6 +231,9 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
             QAction *forward = menu.addAction(QStringLiteral("前进"));
             forward->setEnabled(history()->canGoForward());
             menu.addAction(QStringLiteral("刷新"), this, &QWebEngineView::reload);
+            menu.addAction(QStringLiteral("强制刷新（忽略缓存）"), this, [this]() {
+                page()->triggerAction(QWebEnginePage::ReloadAndBypassCache);
+            });
             menu.addSeparator();
 
             if (!selectedText.isEmpty()) {
