@@ -1,6 +1,8 @@
 #include "toolbox.h"
 #include "qrcodegen.h"
 
+#include <functional>
+
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
@@ -9,7 +11,10 @@
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QFileDialog>
+#include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonValue>
 #include <QJsonParseError>
 #include <QPainter>
 #include <QFormLayout>
@@ -22,6 +27,7 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QRandomGenerator>
+#include <QSet>
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QTextEdit>
@@ -67,8 +73,10 @@ QWidget *ToolboxDialog::createJsonTab()
     auto *btnRow = new QHBoxLayout;
     auto *formatBtn = new QPushButton(QStringLiteral("格式化"), w);
     auto *minifyBtn = new QPushButton(QStringLiteral("压缩"), w);
+    auto *toCppBtn   = new QPushButton(QStringLiteral("→ C++ 结构体"), w);
     btnRow->addWidget(formatBtn);
     btnRow->addWidget(minifyBtn);
+    btnRow->addWidget(toCppBtn);
     btnRow->addStretch();
     lay->addLayout(btnRow);
 
@@ -95,6 +103,50 @@ QWidget *ToolboxDialog::createJsonTab()
             return;
         }
         output->setPlainText(QString::fromUtf8(doc.toJson(QJsonDocument::Compact)));
+    });
+    connect(toCppBtn, &QPushButton::clicked, w, [input, output]() {
+        QJsonParseError parseErr;
+        const QJsonDocument doc = QJsonDocument::fromJson(
+            input->toPlainText().toUtf8(), &parseErr);
+        if (parseErr.error != QJsonParseError::NoError) {
+            output->setPlainText(QStringLiteral("JSON 错误：") + parseErr.errorString());
+            return;
+        }
+        QStringList structs;
+        QSet<QString> emitted;
+        std::function<QString(const QJsonValue &, const QString &)> gen;
+        gen = [&](const QJsonValue &val, const QString &name) -> QString {
+            if (val.isObject()) {
+                const QJsonObject obj = val.toObject();
+                const QString typeName = name.isEmpty() ? QStringLiteral("Root") : name;
+                if (!emitted.contains(typeName)) {
+                    emitted.insert(typeName);
+                    QString body;
+                    for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+                        const QString field = it.key();
+                        body += QStringLiteral("    %1 %2;")
+                                    .arg(gen(it.value(), field), field)
+                                + QChar(10);
+                    }
+                    structs.prepend(QStringLiteral("struct %1 {%2%3};%2")
+                                        .arg(typeName, QChar(10), body));
+                }
+                return typeName;
+            }
+            if (val.isArray()) {
+                const QJsonArray arr = val.toArray();
+                if (arr.isEmpty())
+                    return QStringLiteral("QJsonArray");
+                return QStringLiteral("QList<%1>").arg(gen(arr.first(), name));
+            }
+            if (val.isBool())   return QStringLiteral("bool");
+            if (val.isDouble()) return QStringLiteral("double");
+            if (val.isString()) return QStringLiteral("QString");
+            return QStringLiteral("QJsonValue");
+        };
+        gen(doc.isObject() ? QJsonValue(doc.object()) : QJsonValue(doc.array()),
+            QStringLiteral("Root"));
+        output->setPlainText(structs.join(QChar(10)));
     });
     return w;
 }
