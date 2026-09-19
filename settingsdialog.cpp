@@ -1,6 +1,8 @@
 #include "settingsdialog.h"
 
+#include <QApplication>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFileDialog>
@@ -30,7 +32,14 @@ SettingsDialog::SettingsDialog(QWidget *parent)
 
     m_homeEdit = new QLineEdit(this);
     m_homeEdit->setPlaceholderText(QStringLiteral("https://www.bing.com"));
-    form->addRow(QStringLiteral("主页："), m_homeEdit);
+    auto *homePasteBtn = new QPushButton(QStringLiteral("粘贴"), this);
+    auto *homeRow = new QHBoxLayout;
+    homeRow->addWidget(m_homeEdit, 1);
+    homeRow->addWidget(homePasteBtn);
+    form->addRow(QStringLiteral("主页："), homeRow);
+    connect(homePasteBtn, &QPushButton::clicked, this, [this]() {
+        m_homeEdit->setText(QApplication::clipboard()->text().trimmed());
+    });
 
     m_engineCombo = new QComboBox(this);
     m_engineCombo->addItems({QStringLiteral("Bing"),
