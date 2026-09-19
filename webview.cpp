@@ -3,6 +3,13 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QStandardPaths>
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QWebEngineCertificateError>
@@ -284,6 +291,28 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
                 });
                 menu.addAction(QStringLiteral("在新标签打开图片"), this, [this, mediaUrl]() {
                     emit newTabRequested(mediaUrl, true);
+                });
+                menu.addAction(QStringLiteral("下载图片"), this, [mediaUrl]() {
+                    QNetworkAccessManager *nam = new QNetworkAccessManager;
+                    QNetworkRequest req(mediaUrl);
+                    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Breeze"));
+                    QNetworkReply *reply = nam->get(req);
+                    QObject::connect(reply, &QNetworkReply::finished, nam,
+                                     [reply, nam, mediaUrl]() {
+                        reply->deleteLater();
+                        nam->deleteLater();
+                        if (reply->error() != QNetworkReply::NoError)
+                            return;
+                        QString name = QFileInfo(mediaUrl.path()).fileName();
+                        if (name.isEmpty())
+                            name = QStringLiteral("image.png");
+                        const QString dir =
+                            QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+                        const QString path = QDir(dir).filePath(name);
+                        QFile f(path);
+                        if (f.open(QIODevice::WriteOnly))
+                            f.write(reply->readAll());
+                    });
                 });
             }
             menu.addAction(QStringLiteral("复制页面地址"), this, [this]() {
