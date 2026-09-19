@@ -6,6 +6,7 @@
 #include <QClipboard>
 #include <QColorDialog>
 #include <QComboBox>
+#include <QCryptographicHash>
 #include <QDateTime>
 #include <QFileDialog>
 #include <QJsonDocument>
@@ -41,6 +42,7 @@ ToolboxDialog::ToolboxDialog(QWidget *parent)
     tabs->addTab(createColorTab(),    QStringLiteral("🌈 颜色"));
     tabs->addTab(createUnitTab(),     QStringLiteral("📏 单位"));
     tabs->addTab(createQrTab(),       QStringLiteral("📱 二维码"));
+    tabs->addTab(createHashTab(),     QStringLiteral("🔐 哈希"));
     layout->addWidget(tabs);
 
     auto *closeBtn = new QPushButton(QStringLiteral("关闭"), this);
@@ -428,4 +430,50 @@ QPixmap ToolboxDialog::makeQrPixmap(const QString &text, int size)
     }
     p.end();
     return pix;
+}
+
+QWidget *ToolboxDialog::createHashTab()
+{
+    auto *w = new QWidget;
+    auto *v = new QVBoxLayout(w);
+
+    auto *input = new QTextEdit(w);
+    input->setPlaceholderText(QStringLiteral("输入要计算哈希的文本…"));
+    input->setMaximumHeight(120);
+    v->addWidget(input);
+
+    auto *row = new QHBoxLayout;
+    auto *algoCombo = new QComboBox(w);
+    algoCombo->addItem(QStringLiteral("MD5"),    QVariant::fromValue(int(QCryptographicHash::Md5)));
+    algoCombo->addItem(QStringLiteral("SHA-1"),  QVariant::fromValue(int(QCryptographicHash::Sha1)));
+    algoCombo->addItem(QStringLiteral("SHA-256"),QVariant::fromValue(int(QCryptographicHash::Sha256)));
+    algoCombo->addItem(QStringLiteral("SHA-512"),QVariant::fromValue(int(QCryptographicHash::Sha512)));
+    auto *calcBtn = new QPushButton(QStringLiteral("计算"), w);
+    auto *upperBtn = new QPushButton(QStringLiteral("大写"), w);
+    row->addWidget(new QLabel(QStringLiteral("算法："), w));
+    row->addWidget(algoCombo);
+    row->addWidget(calcBtn);
+    row->addWidget(upperBtn);
+    row->addStretch();
+    v->addLayout(row);
+
+    auto *output = new QLineEdit(w);
+    output->setReadOnly(true);
+    output->setPlaceholderText(QStringLiteral("结果…"));
+    v->addWidget(output);
+
+    auto calc = [input, algoCombo, output]() {
+        const auto algo = QCryptographicHash::Algorithm(
+            algoCombo->currentData().toInt());
+        const QByteArray hash = QCryptographicHash::hash(
+            input->toPlainText().toUtf8(), algo);
+        output->setText(QString::fromLatin1(hash.toHex()));
+    };
+    QObject::connect(calcBtn, &QPushButton::clicked, w, calc);
+    QObject::connect(upperBtn, &QPushButton::clicked, w, [output]() {
+        output->setText(output->text().toUpper());
+    });
+
+    v->addStretch();
+    return w;
 }
