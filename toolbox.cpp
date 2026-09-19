@@ -76,9 +76,11 @@ QWidget *ToolboxDialog::createJsonTab()
     auto *formatBtn = new QPushButton(QStringLiteral("格式化"), w);
     auto *minifyBtn = new QPushButton(QStringLiteral("压缩"), w);
     auto *toCppBtn   = new QPushButton(QStringLiteral("→ C++ 结构体"), w);
+    auto *toYamlBtn  = new QPushButton(QStringLiteral("→ YAML"), w);
     btnRow->addWidget(formatBtn);
     btnRow->addWidget(minifyBtn);
     btnRow->addWidget(toCppBtn);
+    btnRow->addWidget(toYamlBtn);
     btnRow->addStretch();
     lay->addLayout(btnRow);
 
@@ -149,6 +151,93 @@ QWidget *ToolboxDialog::createJsonTab()
         gen(doc.isObject() ? QJsonValue(doc.object()) : QJsonValue(doc.array()),
             QStringLiteral("Root"));
         output->setPlainText(structs.join(QChar(10)));
+    });
+    connect(toYamlBtn, &QPushButton::clicked, w, [input, output]() {
+        QJsonParseError parseErr;
+        const QJsonDocument doc = QJsonDocument::fromJson(
+            input->toPlainText().toUtf8(), &parseErr);
+        if (parseErr.error != QJsonParseError::NoError) {
+            output->setPlainText(QStringLiteral("JSON 错误：") + parseErr.errorString());
+            return;
+        }
+        QString out;
+        QString indent;
+        std::function<void(const QJsonValue &)> emitYaml;
+        // 需要转义的 YAML 特殊字符
+        auto needsQuote = [](const QString &s) {
+            if (s.isEmpty())
+                return true;
+            static const QString specials = QStringLiteral(":#-{}[],&*!|>'\"%@`");
+            for (const QChar c : s) {
+                if (specials.contains(c) || c.isSpace())
+                    return true;
+            }
+            return s.startsWith(QLatin1Char('-')) || s.startsWith(QLatin1Char('?'));
+        };
+        auto scalar = [&](const QJsonValue &v) -> QString {
+            if (v.isString()) {
+                const QString s = v.toString();
+                return needsQuote(s)
+                    ? QStringLiteral("\"") + QString(s).replace(QLatin1Char('"'),
+                          QStringLiteral("\\\"")) + QStringLiteral("\"")
+                    : s;
+            }
+            if (v.isBool())   return v.toBool() ? QStringLiteral("true") : QStringLiteral("false");
+            if (v.isNull())   return QStringLiteral("null");
+            if (v.isDouble()) {
+                const double d = v.toDouble();
+                if (qFuzzyCompare(d, qRound64(d)))
+                    return QString::number(qRound64(d));
+                return QString::number(d);
+            }
+            return QString();
+        };
+        emitYaml = [&](const QJsonValue &val) {
+            if (val.isObject()) {
+                const QJsonObject obj = val.toObject();
+                if (obj.isEmpty()) {
+                    out += QStringLiteral("{}") + QChar(10);
+                    return;
+                }
+                for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+                    const QString key = needsQuote(it.key())
+                        ? QStringLiteral("\"") + it.key() + QStringLiteral("\"")
+                        : it.key();
+                    if (it.value().isObject() || it.value().isArray()) {
+                        out += indent + key + QStringLiteral(":") + QChar(10);
+                        const QString saved = indent;
+                        indent += QStringLiteral("  ");
+                        emitYaml(it.value());
+                        indent = saved;
+                    } else {
+                        out += indent + key + QStringLiteral(": ")
+                             + scalar(it.value()) + QChar(10);
+                    }
+                }
+            } else if (val.isArray()) {
+                const QJsonArray arr = val.toArray();
+                if (arr.isEmpty()) {
+                    out += indent + QStringLiteral("[]") + QChar(10);
+                    return;
+                }
+                for (const QJsonValue &item : arr) {
+                    if (item.isObject() || item.isArray()) {
+                        out += indent + QStringLiteral("-") + QChar(10);
+                        const QString saved = indent;
+                        indent += QStringLiteral("  ");
+                        emitYaml(item);
+                        indent = saved;
+                    } else {
+                        out += indent + QStringLiteral("- ")
+                             + scalar(item) + QChar(10);
+                    }
+                }
+            } else {
+                out += indent + scalar(val) + QChar(10);
+            }
+        };
+        emitYaml(doc.isObject() ? QJsonValue(doc.object()) : QJsonValue(doc.array()));
+        output->setPlainText(out);
     });
     return w;
 }
