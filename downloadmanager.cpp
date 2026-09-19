@@ -362,6 +362,19 @@ void DownloadManager::appendRecord(const DownloadRecord &rec)
     if (m_records.size() > 200)
         m_records = m_records.mid(0, 200);
     saveRecords();
+    updateWindowTitle();
+}
+
+void DownloadManager::updateWindowTitle()
+{
+    int active = 0;
+    for (auto it = m_rows.constBegin(); it != m_rows.constEnd(); ++it) {
+        if (it.key() && it.key()->state() == QWebEngineDownloadRequest::DownloadInProgress)
+            ++active;
+    }
+    setWindowTitle(active > 0
+        ? QStringLiteral("下载管理 - Breeze（%1 个进行中）").arg(active)
+        : QStringLiteral("下载管理 - Breeze"));
 }
 
 void DownloadManager::updateRecord(QWebEngineDownloadRequest *download)
@@ -527,4 +540,5 @@ void DownloadManager::onStateChanged()
 
     // 状态变化即持久化
     updateRecord(download);
+    updateWindowTitle();
 }

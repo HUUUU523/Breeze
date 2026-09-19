@@ -48,6 +48,7 @@ private:
     QString recordsFilePath() const;
     void appendRecord(const DownloadRecord &rec);
     void updateRecord(QWebEngineDownloadRequest *download);
+    void updateWindowTitle();
 
     QTableWidget *m_table = nullptr;
     QHash<QWebEngineDownloadRequest *, int> m_rows;
