@@ -2621,8 +2621,14 @@ void BrowserWindow::saveSession() const
 
 void BrowserWindow::restoreSession()
 {
+    const int startup = SettingsDialog::startupBehavior();
     // 启动行为：1=打开主页（不走会话恢复）
-    if (SettingsDialog::startupBehavior() == 1) {
+    if (startup == 1) {
+        createTab(homeUrl(), true);
+        return;
+    }
+    // 2=打开新标签页（快速拨号）
+    if (startup == 2) {
         WebView *v = createTab(QUrl(), true);
         if (v)
             v->setHtml(dialsHtml());

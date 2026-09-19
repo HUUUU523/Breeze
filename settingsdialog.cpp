@@ -57,6 +57,7 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_startupCombo = new QComboBox(this);
     m_startupCombo->addItem(QStringLiteral("恢复上次会话"), 0);
     m_startupCombo->addItem(QStringLiteral("打开主页"), 1);
+    m_startupCombo->addItem(QStringLiteral("打开新标签页"), 2);
     form->addRow(QStringLiteral("启动时："), m_startupCombo);
 
     m_newTabCombo = new QComboBox(this);
@@ -159,7 +160,7 @@ void SettingsDialog::load()
     m_engineCombo->setCurrentText(searchEngine());
     m_historyCheck->setChecked(recordHistory());
     m_checkUpdateCheck->setChecked(checkUpdateOnStartup());
-    m_startupCombo->setCurrentIndex(startupBehavior() == 1 ? 1 : 0);
+    m_startupCombo->setCurrentIndex(qBound(0, startupBehavior(), 2));
     m_newTabCombo->setCurrentIndex(qBound(0, newTabBehavior(), 2));
     m_minFontSpin->setValue(minFontSize());
     m_openAfterDlCheck->setChecked(openFileAfterDownload());
