@@ -31,6 +31,8 @@
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QTextEdit>
+#include <QUrl>
+#include <QUrlQuery>
 #include <QVBoxLayout>
 
 ToolboxDialog::ToolboxDialog(QWidget *parent)
@@ -165,7 +167,8 @@ QWidget *ToolboxDialog::createEncodeTab()
     auto *urlDec = new QPushButton(QStringLiteral("URL 解码"), w);
     auto *b64Enc = new QPushButton(QStringLiteral("Base64 编码"), w);
     auto *b64Dec = new QPushButton(QStringLiteral("Base64 解码"), w);
-    for (auto *b : {urlEnc, urlDec, b64Enc, b64Dec})
+    auto *urlParams = new QPushButton(QStringLiteral("解析 URL 参数"), w);
+    for (auto *b : {urlEnc, urlDec, b64Enc, b64Dec, urlParams})
         btnRow->addWidget(b);
     btnRow->addStretch();
     lay->addLayout(btnRow);
@@ -189,6 +192,26 @@ QWidget *ToolboxDialog::createEncodeTab()
     connect(b64Dec, &QPushButton::clicked, w, [input, output]() {
         output->setPlainText(QString::fromUtf8(
             QByteArray::fromBase64(input->toPlainText().toUtf8())));
+    });
+    connect(urlParams, &QPushButton::clicked, w, [input, output]() {
+        const QUrl url(input->toPlainText().trimmed());
+        if (!url.isValid()) {
+            output->setPlainText(QStringLiteral("URL 无效"));
+            return;
+        }
+        QStringList rows;
+        rows << QStringLiteral("scheme:  ") + url.scheme();
+        rows << QStringLiteral("host:    ") + url.host();
+        rows << QStringLiteral("port:    ") + QString::number(url.port());
+        rows << QStringLiteral("path:    ") + url.path();
+        rows << QStringLiteral("fragment:") + url.fragment();
+        rows << QStringLiteral("--- query ---");
+        const QList<QPair<QString, QString>> items = QUrlQuery(url).queryItems();
+        if (items.isEmpty())
+            rows << QStringLiteral("(无参数)");
+        for (const auto &kv : items)
+            rows << QStringLiteral("%1 = %2").arg(kv.first, kv.second);
+        output->setPlainText(rows.join(QChar(10)));
     });
     return w;
 }
