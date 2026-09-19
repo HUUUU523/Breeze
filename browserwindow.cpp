@@ -242,6 +242,27 @@ void BrowserWindow::setupActions()
     m_urlBar->setCompleter(m_completer);
     connect(m_urlBar, &QLineEdit::textEdited, this, &BrowserWindow::refreshUrlCompleter);
 
+    // 地址栏右键：粘贴并转到
+    m_urlBar->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_urlBar, &QLineEdit::customContextMenuRequested, this,
+            [this](const QPoint &pos) {
+                QMenu menu;
+                menu.addAction(QStringLiteral("撤销"), m_urlBar, &QLineEdit::undo);
+                menu.addAction(QStringLiteral("重做"), m_urlBar, &QLineEdit::redo);
+                menu.addSeparator();
+                menu.addAction(QStringLiteral("剪切"), m_urlBar, &QLineEdit::cut);
+                menu.addAction(QStringLiteral("复制"), m_urlBar, &QLineEdit::copy);
+                QAction *pasteGo = menu.addAction(QStringLiteral("粘贴并转到"));
+                menu.addAction(QStringLiteral("删除"), m_urlBar, &QLineEdit::del);
+                menu.addSeparator();
+                menu.addAction(QStringLiteral("全选"), m_urlBar, &QLineEdit::selectAll);
+                QAction *chosen = menu.exec(m_urlBar->mapToGlobal(pos));
+                if (chosen == pasteGo) {
+                    m_urlBar->setText(QApplication::clipboard()->text().trimmed());
+                    onUrlEntered();
+                }
+            });
+
     // 盾牌：显示当前站点拦截数
     m_shieldLabel = new QLabel(this);
     m_shieldLabel->setToolTip(QStringLiteral("本页拦截的广告/追踪请求"));
