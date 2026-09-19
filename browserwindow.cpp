@@ -1473,6 +1473,14 @@ WebView *BrowserWindow::createTabView(bool privateMode)
 
     // 允许网页通过脚本打开新窗口（由 createWindow 回调接管）
     view->settings()->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, true);
+    // 网页最小字号
+    {
+        const int minPx = SettingsDialog::minFontSize();
+        if (minPx > 0) {
+            view->settings()->setFontSize(QWebEngineSettings::MinimumFontSize, minPx);
+            view->settings()->setFontSize(QWebEngineSettings::MinimumLogicalFontSize, minPx);
+        }
+    }
 
     // 新窗口请求：向本窗口索取一个已加入标签栏的新 WebView，
     // Qt 会把新窗口内容加载进该视图（真正打开新标签）

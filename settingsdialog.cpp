@@ -53,6 +53,12 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_newTabCombo->addItem(QStringLiteral("空白页"), 2);
     form->addRow(QStringLiteral("新标签页："), m_newTabCombo);
 
+    m_minFontSpin = new QSpinBox(this);
+    m_minFontSpin->setRange(0, 48);
+    m_minFontSpin->setSuffix(QStringLiteral(" px"));
+    m_minFontSpin->setSpecialValueText(QStringLiteral("默认"));
+    form->addRow(QStringLiteral("网页最小字号："), m_minFontSpin);
+
     layout->addLayout(form);
 
     // ---- 代理 ----
@@ -133,6 +139,7 @@ void SettingsDialog::load()
     m_historyCheck->setChecked(recordHistory());
     m_startupCombo->setCurrentIndex(startupBehavior() == 1 ? 1 : 0);
     m_newTabCombo->setCurrentIndex(qBound(0, newTabBehavior(), 2));
+    m_minFontSpin->setValue(minFontSize());
 
     const QString pt = proxyType();
     const int idx = m_proxyTypeCombo->findData(pt);
@@ -152,6 +159,7 @@ void SettingsDialog::onAccepted()
     setRecordHistory(m_historyCheck->isChecked());
     setStartupBehavior(m_startupCombo->currentData().toInt());
     setNewTabBehavior(m_newTabCombo->currentData().toInt());
+    setMinFontSize(m_minFontSpin->value());
     setDownloadSpeedLimit(m_speedLimitSpin->value());
     setDownloadDirectory(m_downloadDirEdit->text());
     setProxy(m_proxyTypeCombo->currentData().toString(),
@@ -276,6 +284,18 @@ void SettingsDialog::setDownloadDirectory(const QString &dir)
 {
     QSettings s(kOrg, kApp);
     s.setValue(QStringLiteral("download/directory"), dir.trimmed());
+}
+
+int SettingsDialog::minFontSize()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("web/minFontSize"), 0).toInt();
+}
+
+void SettingsDialog::setMinFontSize(int px)
+{
+    QSettings s(kOrg, kApp);
+    s.setValue(QStringLiteral("web/minFontSize"), qMax(0, px));
 }
 
 int SettingsDialog::startupBehavior()
