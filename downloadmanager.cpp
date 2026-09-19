@@ -9,6 +9,8 @@
 #include <QSystemTrayIcon>
 #include <QTimer>
 #include <QStyle>
+#include "settingsdialog.h"
+
 #include <QDesktopServices>
 #include <QDir>
 #include <QProcess>
@@ -375,7 +377,14 @@ void DownloadManager::updateRecord(QWebEngineDownloadRequest *download)
     rec.startedAt = QDateTime::currentDateTime();
 
     switch (download->state()) {
-    case QWebEngineDownloadRequest::DownloadCompleted:  rec.status = QStringLiteral("已完成"); break;
+    case QWebEngineDownloadRequest::DownloadCompleted:
+        rec.status = QStringLiteral("已完成");
+        if (SettingsDialog::openFileAfterDownload()) {
+            const QString path = download->downloadDirectory()
+                + QLatin1Char('/') + download->downloadFileName();
+            QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+        }
+        break;
     case QWebEngineDownloadRequest::DownloadCancelled:  rec.status = QStringLiteral("已取消"); break;
     case QWebEngineDownloadRequest::DownloadInterrupted: rec.status = QStringLiteral("已中断"); break;
     default: rec.status = QStringLiteral("下载中"); break;

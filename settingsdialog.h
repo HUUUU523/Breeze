@@ -51,6 +51,10 @@ public:
     static int     defaultFontSize();
     static void    setDefaultFontSize(int px);
 
+    // 下载完成后自动打开文件
+    static bool    openFileAfterDownload();
+    static void    setOpenFileAfterDownload(bool on);
+
     // 启动时检查更新
     static bool    checkUpdateOnStartup();
     static void    setCheckUpdateOnStartup(bool enabled);
@@ -82,6 +86,7 @@ private:
     QSpinBox  *m_minFontSpin    = nullptr;
     QSpinBox  *m_defFontSpin    = nullptr;
     QCheckBox *m_checkUpdateCheck = nullptr;
+    QCheckBox *m_openAfterDlCheck = nullptr;
     QLineEdit *m_downloadDirEdit = nullptr;
     QComboBox *m_startupCombo   = nullptr;
     QComboBox *m_newTabCombo    = nullptr;

@@ -77,6 +77,9 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_defFontSpin->setSpecialValueText(QStringLiteral("默认"));
     form->addRow(QStringLiteral("网页默认字号："), m_defFontSpin);
 
+    m_openAfterDlCheck = new QCheckBox(QStringLiteral("下载完成后自动打开文件"), this);
+    form->addRow(QString(), m_openAfterDlCheck);
+
     layout->addLayout(form);
 
     // ---- 代理 ----
@@ -159,6 +162,7 @@ void SettingsDialog::load()
     m_startupCombo->setCurrentIndex(startupBehavior() == 1 ? 1 : 0);
     m_newTabCombo->setCurrentIndex(qBound(0, newTabBehavior(), 2));
     m_minFontSpin->setValue(minFontSize());
+    m_openAfterDlCheck->setChecked(openFileAfterDownload());
     m_defFontSpin->setValue(defaultFontSize());
 
     const QString pt = proxyType();
@@ -181,6 +185,7 @@ void SettingsDialog::onAccepted()
     setStartupBehavior(m_startupCombo->currentData().toInt());
     setNewTabBehavior(m_newTabCombo->currentData().toInt());
     setMinFontSize(m_minFontSpin->value());
+    setOpenFileAfterDownload(m_openAfterDlCheck->isChecked());
     setDefaultFontSize(m_defFontSpin->value());
     setDownloadSpeedLimit(m_speedLimitSpin->value());
     setDownloadDirectory(m_downloadDirEdit->text());
@@ -306,6 +311,18 @@ void SettingsDialog::setDownloadDirectory(const QString &dir)
 {
     QSettings s(kOrg, kApp);
     s.setValue(QStringLiteral("download/directory"), dir.trimmed());
+}
+
+bool SettingsDialog::openFileAfterDownload()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("download/openAfterFinish"), false).toBool();
+}
+
+void SettingsDialog::setOpenFileAfterDownload(bool on)
+{
+    QSettings s(kOrg, kApp);
+    s.setValue(QStringLiteral("download/openAfterFinish"), on);
 }
 
 int SettingsDialog::minFontSize()
