@@ -8,6 +8,7 @@
 #include <QHeaderView>
 #include <QLineEdit>
 #include <QInputDialog>
+#include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
@@ -26,6 +27,9 @@ BookmarkManager::BookmarkManager(QWidget *parent)
     m_filter->setPlaceholderText(QStringLiteral("搜索书签（名称或地址）…"));
     m_filter->setClearButtonEnabled(true);
     layout->addWidget(m_filter);
+
+    m_countLabel = new QLabel(this);
+    layout->addWidget(m_countLabel);
 
     m_tree = new QTreeWidget(this);
     m_tree->setHeaderLabels({QStringLiteral("名称"), QStringLiteral("地址")});
@@ -140,6 +144,9 @@ void BookmarkManager::rebuild()
     // 标题显示条数
     const int total = m_bookmarks ? m_bookmarks->size() : 0;
     setWindowTitle(QStringLiteral("书签管理（%1 条） - Breeze").arg(total));
+    if (m_countLabel)
+        m_countLabel->setText(QStringLiteral("共 %1 条书签，%2 个分组")
+                                  .arg(total).arg(allGroups().size()));
 }
 
 void BookmarkManager::onFilterChanged(const QString &text)

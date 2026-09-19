@@ -38,6 +38,7 @@ private:
 
     QTreeWidget *m_tree = nullptr;
     QLineEdit   *m_filter = nullptr;
+    QLabel      *m_countLabel = nullptr;
     QList<Bookmark> *m_bookmarks = nullptr;
 };
 
