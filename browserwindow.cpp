@@ -2513,6 +2513,9 @@ void BrowserWindow::onLoadStarted()
         return;
     m_progress->setValue(0);
     m_progress->show();
+    // 记录加载起始时间，用于在状态栏显示耗时
+    if (auto *v = qobject_cast<WebView *>(sender()))
+        v->setProperty("breezeLoadStart", QDateTime::currentMSecsSinceEpoch());
     // 极简模式无停止按钮
 }
 
@@ -2534,6 +2537,14 @@ void BrowserWindow::onLoadFinished(bool ok)
         m_progress->hide();
         m_progress->setValue(0);
         updateNavButtons();
+        // 显示加载耗时
+        const qint64 start = view->property("breezeLoadStart").toLongLong();
+        if (start > 0) {
+            const qint64 ms = QDateTime::currentMSecsSinceEpoch() - start;
+            statusBar()->showMessage(
+                QStringLiteral("加载完成，用时 %1 ms").arg(ms), 3000);
+            view->setProperty("breezeLoadStart", QVariant());
+        }
     }
 
     // 记录历史：使用实际完成加载的标签，而非当前标签
