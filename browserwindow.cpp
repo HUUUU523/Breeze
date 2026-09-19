@@ -1480,6 +1480,11 @@ WebView *BrowserWindow::createTabView(bool privateMode)
             view->settings()->setFontSize(QWebEngineSettings::MinimumFontSize, minPx);
             view->settings()->setFontSize(QWebEngineSettings::MinimumLogicalFontSize, minPx);
         }
+        const int defPx = SettingsDialog::defaultFontSize();
+        if (defPx > 0) {
+            view->settings()->setFontSize(QWebEngineSettings::DefaultFontSize, defPx);
+            view->settings()->setFontSize(QWebEngineSettings::DefaultFixedFontSize, defPx);
+        }
     }
 
     // 新窗口请求：向本窗口索取一个已加入标签栏的新 WebView，

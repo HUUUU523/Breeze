@@ -59,6 +59,12 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_minFontSpin->setSpecialValueText(QStringLiteral("默认"));
     form->addRow(QStringLiteral("网页最小字号："), m_minFontSpin);
 
+    m_defFontSpin = new QSpinBox(this);
+    m_defFontSpin->setRange(0, 48);
+    m_defFontSpin->setSuffix(QStringLiteral(" px"));
+    m_defFontSpin->setSpecialValueText(QStringLiteral("默认"));
+    form->addRow(QStringLiteral("网页默认字号："), m_defFontSpin);
+
     layout->addLayout(form);
 
     // ---- 代理 ----
@@ -140,6 +146,7 @@ void SettingsDialog::load()
     m_startupCombo->setCurrentIndex(startupBehavior() == 1 ? 1 : 0);
     m_newTabCombo->setCurrentIndex(qBound(0, newTabBehavior(), 2));
     m_minFontSpin->setValue(minFontSize());
+    m_defFontSpin->setValue(defaultFontSize());
 
     const QString pt = proxyType();
     const int idx = m_proxyTypeCombo->findData(pt);
@@ -160,6 +167,7 @@ void SettingsDialog::onAccepted()
     setStartupBehavior(m_startupCombo->currentData().toInt());
     setNewTabBehavior(m_newTabCombo->currentData().toInt());
     setMinFontSize(m_minFontSpin->value());
+    setDefaultFontSize(m_defFontSpin->value());
     setDownloadSpeedLimit(m_speedLimitSpin->value());
     setDownloadDirectory(m_downloadDirEdit->text());
     setProxy(m_proxyTypeCombo->currentData().toString(),
@@ -296,6 +304,18 @@ void SettingsDialog::setMinFontSize(int px)
 {
     QSettings s(kOrg, kApp);
     s.setValue(QStringLiteral("web/minFontSize"), qMax(0, px));
+}
+
+int SettingsDialog::defaultFontSize()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("web/defaultFontSize"), 0).toInt();
+}
+
+void SettingsDialog::setDefaultFontSize(int px)
+{
+    QSettings s(kOrg, kApp);
+    s.setValue(QStringLiteral("web/defaultFontSize"), qMax(0, px));
 }
 
 int SettingsDialog::startupBehavior()

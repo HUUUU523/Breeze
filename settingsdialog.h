@@ -47,6 +47,10 @@ public:
     static int     minFontSize();
     static void    setMinFontSize(int px);
 
+    // 网页默认字号（像素，0 = 浏览器默认）
+    static int     defaultFontSize();
+    static void    setDefaultFontSize(int px);
+
     // 启动行为：0=恢复上次会话，1=打开主页
     static int     startupBehavior();
     static void    setStartupBehavior(int mode);
@@ -72,6 +76,7 @@ private:
     QSpinBox  *m_proxyPortSpin  = nullptr;
     QSpinBox  *m_speedLimitSpin = nullptr;
     QSpinBox  *m_minFontSpin    = nullptr;
+    QSpinBox  *m_defFontSpin    = nullptr;
     QLineEdit *m_downloadDirEdit = nullptr;
     QComboBox *m_startupCombo   = nullptr;
     QComboBox *m_newTabCombo    = nullptr;
