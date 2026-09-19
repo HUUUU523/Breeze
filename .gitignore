@@ -22,6 +22,9 @@ cmake_install.cmake
 gh_login.txt
 *.log
 
+# 构建日志（临时）
+build_log.txt
+
 # 证书（切勿提交）
 *.pfx
 *.p12
