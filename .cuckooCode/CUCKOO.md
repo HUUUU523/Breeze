@@ -2,16 +2,22 @@
 
 > Breeze —— 基于 Qt6 + Qt WebEngine 的 C++ 多标签浏览器
 
+本文件面向 AI 编程助手（Cuckoo Code），说明本项目的结构、约定与开发流程，供在本仓库内进行代码修改时参考。
+
+---
+
 ## 项目概览
 
-Breeze 是一个用 C++ / Qt6 编写的多标签浏览器，渲染内核采用 Qt WebEngine（Chromium）。
-
 - **项目名**：Breeze
-- **版本**：1.0.0
+- **当前版本**：2.4.5（定义于 `CMakeLists.txt` 的 `project(Breeze VERSION ...)`）
 - **语言标准**：C++17
-- **构建系统**：CMake + Ninja
+- **构建系统**：CMake 3.19+ + Ninja
 - **GUI 框架**：Qt6 Widgets
-- **渲染内核**：Qt WebEngine (Chromium)
+- **渲染内核**：Qt WebEngine（Chromium）
+- **平台**：Windows 10/11 x64
+- **仓库**：https://github.com/HUUUU523/Breeze
+
+---
 
 ## 环境要求
 
@@ -25,143 +31,13 @@ Breeze 是一个用 C++ / Qt6 编写的多标签浏览器，渲染内核采用 Q
 | Ninja | `D:\Qt\Tools\Ninja` |
 | 操作系统 | Windows x64 |
 
-> ⚠️ **重要**：Qt WebEngine 只安装在 `msvc2022_64` 套件中，`mingw_64` 套件 **没有** WebEngine。
-> 因此必须使用 **MSVC 工具链** 编译，不能用 MinGW。
+> ⚠️ **重要**：Qt WebEngine 只安装在 `msvc2022_64` 套件中，`mingw_64` 套件**没有** WebEngine。
+> 因此必须使用 **MSVC 工具链**编译，不能用 MinGW。
 >
 > ⚠️ 构建（`cmake --build`）也必须在 **vcvars64 环境**下执行，否则会报
 > `无法打开包括文件: "type_traits"`（缺少 MSVC 的 INCLUDE 变量）。
 
-## 目录结构
-
-```
-Breeze/
-├── CMakeLists.txt        # CMake 构建配置
-├── configure.bat         # 一键配置脚本（加载 MSVC 环境 + 运行 CMake）
-├── main.cpp              # 程序入口，QApplication / Profile 初始化
-├── browserwindow.h       # 主窗口类声明
-├── browserwindow.cpp     # 主窗口实现（标签、导航、地址栏、进度、书签、历史）
-├── webview.h             # 自定义 QWebEngineView（新窗口请求处理）
-├── webview.cpp           # 自定义 QWebEngineView 实现
-├── downloadmanager.h     # 下载管理窗口
-├── downloadmanager.cpp   # 下载管理窗口实现
-├── historymanager.h      # 历史记录窗口
-├── historymanager.cpp    # 历史记录窗口实现
-├── settingsdialog.h      # 设置对话框（静态配置读写）
-├── settingsdialog.cpp    # 设置对话框实现
-├── bookmarkmanager.h     # 书签管理对话框（树形、拖拽分组）
-├── bookmarkmanager.cpp   # 书签管理对话框实现
-├── syncmanager.h         # WebDAV 云同步（加密上传/下载）
-├── syncmanager.cpp       # 云同步实现
-├── syncdialog.h          # 云同步配置对话框
-├── syncdialog.cpp        # 云同步配置实现
-├── userscriptmanager.h   # 用户脚本 / 用户样式管理
-├── userscriptmanager.cpp # 用户脚本 / 用户样式实现
-├── translator.h          # 多语言（代码内字典）
-├── translator.cpp        # 多语言实现
-├── toolbox.h             # 工具箱（7 个实用工具）
-├── toolbox.cpp           # 工具箱实现
-├── qrcodegen.h           # 二维码生成（内置，零依赖）
-└── qrcodegen.cpp         # 二维码生成实现
-```
-
-## 功能特性
-
-已实现：
-
-- **多标签页**（`QTabWidget`，支持关闭、拖动排序、至少保留一个）
-- **地址栏**（回车跳转；网址自动补 `https://`；非网址按搜索引擎搜索）
-- **导航按钮**：后退 / 前进 / 刷新 / 停止 / 主页（使用 `QStyle` 标准图标）
-- **加载进度条**（右下角状态栏，仅反映当前标签）
-- **标签标题与 URL 自动同步**
-- **新窗口请求 → 新标签**（`target=_blank`、`window.open` 真正在新标签打开）
-- **书签栏 + 书签管理**（顶部工具栏，点击跳转，右键删除，JSON 持久化）
-- **下载管理窗口**（`QTableWidget`，实时进度条，暂停/继续、取消、打开文件夹）
-- **历史记录窗口**（搜索过滤、双击跳转、清空、JSON 持久化，最多 500 条）
-- **设置对话框**（主页、默认搜索引擎、是否记录历史，存于 `QSettings`）
-- **书签管理对话框**（树形显示分组/书签，拖拽移动分组，增删改）
-- **深色主题**（跟随系统 / 浅色 / 深色，工具栏 🎨 菜单切换，系统主题变化自动响应）
-- **云同步**（WebDAV，书签+历史打包加密上传/下载，口令派生密钥 + 随机 IV）
-- **双向同步合并**（上传前先下载云端，按 URL 合并书签/历史，冲突取较新记录）
-- **用户脚本（UserScript / UserStyle）**（JS 或 CSS，URL 通配匹配，页面加载后自动注入）
-- **多语言**（中文 / English，工具栏 🌐 菜单切换，代码内字典）
-- **广告拦截**（adblocker.h/.cpp，内置域名黑名单 + URL 关键字规则，菜单可开关）
-- **右键菜单增强**（复制链接/媒体地址、AI 解释/翻译/改写选中文字）
-- **书签导入导出**（Chrome/Edge Netscape HTML 格式）
-- **历史导入导出**（JSON 格式）
-- **AI 助手**（OpenAI 兼容接口，菜单「AI 对话…」「AI 总结当前页」）：
-  - 支持 OpenAI / DeepSeek / 通义千问 / Kimi / Ollama 等所有 `/v1/chat/completions` 服务
-  - 多轮对话窗口，接口地址/API Key/模型名可配置（存 QSettings）
-  - 一键提取当前页正文并让 AI 总结
-- **工具箱**（工具栏 🧰，7 个标签页）：
-  - JSON 格式化 / 压缩
-  - URL 编码解码、Base64 编码解码
-  - 时间戳 ↔ 日期转换
-  - 随机密码生成
-  - 颜色 HEX ↔ RGB 转换 + 取色器
-  - 单位换算（长度 / 重量 / 温度）
-  - 二维码生成（内置 QR 编码器，保存为 PNG）
-- **下载断点续传**（QNetworkAccessManager + Range 头，中断后从断点继续）
-- **页面查找**（Ctrl+F，输入即高亮，上一个/下一个，Esc 关闭）
-- **页面缩放**（Ctrl+= 放大、Ctrl+- 缩小、Ctrl+0 复位，范围 25%~500%）
-- **打印 / 导出 PDF**（Ctrl+P 生成打印文件并打开；Ctrl+Shift+P 保存为 PDF）
-- **会话恢复**（关闭时保存标签页，下次启动恢复，隐私标签不保存）
-- **隐私模式标签页**（Ctrl+Shift+N，独立非持久化 Profile，不写盘、不记历史/会话）
-- **书签分组**（书签可归属分组，书签栏按分组显示为下拉菜单）
-- **历史记录按日期分组**（今天 / 昨天 / yyyy-MM-dd 分组标题）
-- **下载记录持久化**（下载元数据存 `downloads.json`，重启后仍可见）
-- **快捷键**：Ctrl+T 新标签、Ctrl+Shift+N 隐私标签、Ctrl+W 关标签、
-  Ctrl+L 聚焦地址栏、Ctrl+F 查找、F5/Ctrl+R 刷新、Alt+←/→ 前进后退、
-  Ctrl+Tab 切换标签、Ctrl+P 打印、Ctrl+Shift+P 存 PDF、Ctrl+=/-/0 缩放
-- **持久化 Profile**（缓存/存储在 AppData 下）
-- **旧数据自动迁移**（首次启动把程序目录下的旧 bookmarks/history 搬到 AppData）
-
-## 数据存储位置
-
-所有用户数据写入 **`QStandardPaths::AppDataLocation`**（即
-`C:\Users\<用户>\AppData\Roaming\Breeze\Breeze\`），而非程序目录
-（避免 Program Files 下无写权限导致静默失败）：
-
-| 文件 | 内容 |
-|------|------|
-| `bookmarks.json` | 书签（含分组） |
-| `history.json` | 历史记录 |
-| `downloads.json` | 下载记录元数据 |
-| `userscripts.json` | 用户脚本 / 用户样式 |
-| `profile/` | WebEngine 持久化存储 |
-| `profile/cache/` | WebEngine 缓存 |
-
-会话恢复数据存于 `QSettings`（组织名/应用名均为 `Breeze`，注册表或 ini）。
-
-下载文件默认保存到系统「下载」目录（`QStandardPaths::DownloadLocation`）。
-
-## 构建方式
-
-### 方式一：使用 configure.bat（推荐）
-
-```bat
-cd D:\C++\Breeze
-configure.bat
-cmake --build build
-```
-
-`configure.bat` 内容为：
-
-```bat
-@echo off
-call "D:\VSBuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul
-set PATH=D:\Qt\6.11.2\msvc2022_64\bin;D:\Qt\Tools\Ninja;%PATH%
-set CMAKE_PREFIX_PATH=D:\Qt\6.11.2\msvc2022_64
-cd /d D:\C++\Breeze
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=D:\Qt\6.11.2\msvc2022_64
-```
-
-> 注意：`cmake --build build` 也必须在同一个 vcvars64 环境里执行。若在普通
-> cmd 里单独跑会失败。推荐用一条命令完成：
-> ```bat
-> cmd /c "call "D:\VSBuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul && cmake --build D:\C++\Breeze\build"
-> ```
-
-### 方式二：手动配置
+### 构建命令（务必在 vcvars64 下执行）
 
 ```bat
 call "D:\VSBuildTools\VC\Auxiliary\Build\vcvars64.bat"
@@ -169,114 +45,216 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=D:\Q
 cmake --build build
 ```
 
-### 运行
-
-构建产物位于 `build/Breeze.exe`。运行前需确保 Qt 的 DLL 可被找到，推荐：
+一键（推荐在 AI 环境中使用，整条命令自包含）：
 
 ```bat
+cmd /c "call "D:\VSBuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul && cmake --build D:\C++\Breeze\build"
+```
+
+或使用附带的 `configure.bat`（加载环境并配置）：
+
+```bat
+configure.bat
+cmake --build build
+```
+
+### 部署与运行
+
+```bat
+D:\Qt\6.11.2\msvc2022_64\bin\windeployqt.exe --release --no-translations build\Breeze.exe
 set PATH=D:\Qt\6.11.2\msvc2022_64\bin;%PATH%
 build\Breeze.exe
 ```
 
-或使用 `windeployqt` 拷贝依赖（**只读方式部署，程序目录无写权限也能跑**）：
+---
 
-```bat
-D:\Qt\6.11.2\msvc2022_64\bin\windeployqt.exe --release --no-translations build\Breeze.exe
+## 目录结构
+
+```
+Breeze/
+├── CMakeLists.txt        # 构建配置（版本号在此定义，并注入 BREEZE_VERSION 宏）
+├── configure.bat         # 一键配置脚本
+├── app.rc                # Windows 资源（exe 图标，引用 B.ico）
+├── resources.qrc         # Qt 资源（窗口图标 :/B.ico）
+├── installer.iss         # Inno Setup 安装脚本
+├── README.md             # 面向用户的说明
+├── .github/workflows/build.yml   # CI：构建 + 签名 + 打包 + 发布
+│
+├── main.cpp              # 程序入口
+├── browserwindow.h/.cpp  # 主窗口（标签、导航、地址栏、菜单、书签栏、会话）
+├── webview.h/.cpp        # 自定义 QWebEngineView / QWebEnginePage
+├── adblocker.h/.cpp      # 广告拦截 + 盾牌计数 + HTTPS 升级
+├── downloadmanager.h/.cpp
+├── historymanager.h/.cpp
+├── settingsdialog.h/.cpp # 设置对话框 + 静态配置读写
+├── bookmarkmanager.h/.cpp
+├── bookmarksidebar.h/.cpp
+├── syncmanager.h/.cpp    # WebDAV 云同步
+├── syncdialog.h/.cpp
+├── syncmerge.h/.cpp      # 同步数据合并（纯逻辑，可单测）
+├── userscriptmanager.h/.cpp
+├── translator.h/.cpp     # 多语言（代码内字典）
+├── toolbox.h/.cpp        # 工具箱
+├── qrcodegen.h/.cpp      # 二维码生成（内置，零依赖）
+├── aimanager.h/.cpp      # AI 接口（OpenAI 兼容）
+├── aidialog.h/.cpp
+├── aisidebar.h/.cpp
+├── cookiemanagerdialog.h/.cpp
+├── updatemanager.h/.cpp  # GitHub Release 更新检查
+├── logger.h/.cpp         # 文件日志
+├── extension.h/.cpp      # 扩展系统（manifest 解析）
+├── extensiondialog.h/.cpp
+├── docs/ROADMAP.md       # 功能规划
+└── tests/                # 单元测试（Qt Test + CTest）
 ```
 
-## 代码结构说明
+---
+
+## 数据存储
+
+所有用户数据写入 **`QStandardPaths::AppDataLocation`**（即 `%APPDATA%\Breeze\Breeze\`），
+**不写程序目录**（避免 Program Files 下无写权限导致静默失败）：
+
+| 文件 | 内容 |
+|------|------|
+| `bookmarks.json` | 书签（含分组） |
+| `history.json` | 历史记录 |
+| `downloads.json` | 下载记录元数据 |
+| `userscripts.json` | 用户脚本 / 用户样式 |
+| `extensions.json` | 已加载扩展目录列表 |
+| `logs/breeze.log` | 运行日志 |
+| `profile/` | WebEngine 持久化存储 |
+| `profile/cache/` | WebEngine 缓存 |
+
+会话恢复数据存于 `QSettings`（组织名/应用名均为 `Breeze`）。
+下载文件默认保存到系统「下载」目录（可在设置中指定默认下载目录）。
+
+---
+
+## 关键设计
 
 ### main.cpp
-
-- 构造 `QApplication`，设置应用名 / 版本 / 组织名
+- 构造 `QApplication`，设置应用名/版本/组织名
 - 配置默认 `QWebEngineProfile` 的持久化存储与缓存路径（AppData 下）
+- 安装文件日志 `Logger::install()`
+- 应用代理 `SettingsDialog::applyProxy()`
 - 创建并显示 `BrowserWindow`
 
-### BrowserWindow（browserwindow.h / .cpp）
-
-主窗口，继承 `QMainWindow`。
+### BrowserWindow（browserwindow.h/.cpp）
+主窗口，继承 `QMainWindow`，是本项目体量最大的文件。
 
 关键成员：
-
-- `QTabWidget *m_tabs` —— 标签容器
-- `QLineEdit *m_urlBar` —— 地址栏
-- `QProgressBar *m_progress` —— 加载进度
-- `QToolBar *m_bookmarkBar` —— 书签栏
-- `QList<Bookmark> m_bookmarks` / `QList<HistoryEntry> m_history` —— 数据
-- `DownloadManager *m_downloadManager` / `HistoryDialog *m_historyDialog`
+- `QTabWidget *m_tabs`、`QLineEdit *m_urlBar`、`QProgressBar *m_progress`、`QToolBar *m_bookmarkBar`
+- `QList<Bookmark> m_bookmarks`、`QList<HistoryEntry> m_history`、`QList<QUrl> m_closedTabs`
+- `QSet<WebView*> m_pinnedTabs`、`DownloadManager *m_downloadManager` 等
 
 关键方法：
-
-- `createTabView()` —— 建 WebView、连接信号、加入标签栏，并注入"新窗口→新标签"回调
+- `createTabView()` —— 建 WebView、连接信号、加入标签栏，并注入「新窗口→新标签」回调
 - `createTab(url, switchToTab)` —— 基于 createTabView 再加载 URL
-- `migrateLegacyData()` —— 首次启动迁移旧数据（构造时最先调用）
+- `restoreSession()` —— 按启动行为（0=恢复会话 / 1=主页 / 2=新标签页）初始化标签
+- `saveSession()` / `saveBookmarks()` / `saveHistory()` —— 持久化
 - `currentView()` —— 获取当前标签的 `WebView`
 - `recordHistory(WebView*)` —— 按**实际加载完成**的标签记录历史（非当前标签）
-- `onUrlEntered()` —— 地址栏回车；网址直跳，否则按设置的搜索引擎搜索
-- `normalizedUrl()` —— 判断输入是网址还是搜索词
-- `updateTabTitle()` / `updateTabUrl()` —— 同步标签标题与地址栏
-- `updateNavButtons()` —— 根据历史记录启用/禁用前进后退
+- `onUrlEntered()` / `normalizedUrl()` —— 地址栏回车；网址直跳，否则按搜索引擎搜索
+- `onLoadStarted/Progress/Finished` —— 处理加载状态（均判断 `sender() == currentView()`）
 
-### WebView（webview.h / .cpp）
-
+### WebView（webview.h/.cpp）
 自定义 `QWebEngineView`：
+- `setNewTabProvider(std::function<WebView*()>)` —— 注入「提供新标签视图」的回调
+- 重写 `createWindow()` —— 新窗口请求时返回已加入标签栏的空 `WebView`，实现「真正在新标签打开」
+- `BreezeWebPage` —— 重写 `javaScriptConsoleMessage`，解析状态栏悬停链接、划词工具等注入消息
+- 右键菜单：复制链接/图片地址、在新标签打开、下载图片、AI 处理选中文字等
 
-- `setNewTabProvider(std::function<WebView*()>)` —— 注入"提供新标签视图"的回调
-- 重写 `createWindow()` —— 新窗口请求时调用 provider，返回一个已加入标签栏的
-  空 `WebView`，Qt 会把新窗口内容加载进去，从而**真正在新标签打开**
+### SettingsDialog（settingsdialog.h/.cpp）
+配置读写全部为**静态方法**（`QSettings`，组织名/应用名均为 `Breeze`）。
+已支持的配置项：主页、默认搜索引擎、记录历史、启动时行为、新标签页行为、启动时检查更新、
+下载限速、默认下载目录、下载完成后自动打开文件、网页最小字号、网页默认字号、代理、主题等。
+新增配置项时，建议在头文件加 `static getter/setter` + 成员控件，在 `.cpp` 中：
+构造里加控件 → `load()` 里读取 → `onAccepted()` 里保存。
 
-### DownloadManager（downloadmanager.h / .cpp）
-
-下载管理对话框：`QTableWidget` 显示文件名 / 进度 / 状态 / 操作；
-支持暂停/继续、取消、打开文件夹。以下载对象指针为键映射行号，
-并在对象 `destroyed` 时清理映射，避免悬空键。
-
-### HistoryDialog（historymanager.h / .cpp）
-
-历史记录对话框：搜索过滤、双击跳转、清空。
-
-### SettingsDialog（settingsdialog.h / .cpp）
-
-设置对话框；配置读写用静态方法（`QSettings`，组织名/应用名均为 `Breeze`），
-提供主页、搜索引擎、是否记录历史，以及 `searchUrlTemplate()` 搜索模板。
+---
 
 ## 开发约定
 
-- 源文件统一 UTF-8 编码；CMake 中对 MSVC 添加了 `/utf-8` 编译选项
-- 界面使用纯代码构建，**不依赖 .ui 文件**
+- 源文件统一 **UTF-8** 编码；CMake 对 MSVC 添加了 `/utf-8`
+- 界面使用**纯代码构建**，不依赖 `.ui` 文件
 - 使用 `CMAKE_AUTOMOC` 自动处理 Qt moc
 - 字符串字面量优先使用 `QStringLiteral` 包装
 - **用户数据一律写入 AppData**，不写程序目录
 - 导航按钮使用 `QStyle` 标准图标，不依赖外部图片资源
+- 修改现有代码时**尽量缩小改动范围**，不做无关格式化/重构
 
-## 构建依赖（CMake）
+### 版本号维护
+发版时需同步更新三处（保持一致的补丁号/次版本号）：
+1. `CMakeLists.txt`：`project(Breeze VERSION x.y.z ...)`
+2. `installer.iss`：`#define MyAppVersion "x.y.z"`
+3. `README.md`：badge `version-x.y.z-blue`
 
-```cmake
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets WebEngineWidgets PrintSupport Network)
+改版本号后建议**重新配置**（`cmake -S . -B build ...`）再构建，使 `BREEZE_VERSION` 宏更新。
+
+---
+
+## 测试
+
+`tests/test_sync.cpp` 为纯逻辑单元测试（同步数据合并 `SyncMerge::merge`），
+使用 Qt Test + CTest。由 `BREEZE_BUILD_TESTS`（默认 ON）控制是否构建。
+
+```bat
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
-## 已修复的重要问题（历史记录）
+---
 
-以下是开发过程中修复的隐患，供后续维护参考：
+## CI / 发布流程
 
-1. **历史记错 URL** —— 后台标签加载完成时曾用 `currentView()` 记录，
-   会记录成当前标签的 URL。已改为按 `sender()` 定位实际标签。
-2. **进度条/导航按钮被后台标签污染** —— `onLoadStarted/Progress/Finished`
-   曾不区分标签。已加 `sender() != currentView()` 判断。
-3. **数据写在程序目录** —— 书签/历史/Profile 曾用 `applicationDirPath()`，
-   在 Program Files 下无写权限会静默失败。已改用 `AppDataLocation`。
-4. **下载目录不可写** —— 下载曾存到程序目录。已改用系统「下载」目录。
-5. **书签右键菜单误配** —— 曾用 `findChildren` 全量扫描按钮。
-   已改用 `widgetForAction()` 精确取按钮。
-6. **下载映射悬空键** —— 曾以裸指针为键且不清理。已加 `destroyed` 连接清理。
-7. **新窗口请求未处理** —— 曾只发信号不响应 request。已改为重写
-   `createWindow()` + provider 回调，真正在新标签打开。
+`.github/workflows/build.yml`：
+- 触发：push 到 `main`、打 `v*` tag、PR、手动
+- 步骤：安装 Qt 6.8.1（qtwebengine/qtwebchannel/qtpositioning）→ MSVC 环境 →
+  CMake 配置 → 构建 → `windeployqt` → 解码签名证书 → 签名 `Breeze.exe` →
+  打包 zip → Inno Setup 生成安装包 → 签名安装包 → 上传 artifacts →
+  若为 tag 则发布到 GitHub Release
+- **代码签名**：依赖仓库 secrets `CODE_SIGN_PFX_BASE64`、`CODE_SIGN_PFX_PASSWORD`；
+  自签名证书，签名后 Windows 仍可能显示「未知发布者」
+
+发布新版本：更新版本号 → 构建验证 → 提交推送 → `git tag vX.Y.Z && git push origin vX.Y.Z`。
+
+---
+
+## 注意事项 / 已知坑
+
+1. `readLines` / `read` 工具有行数上限（默认 2000），`browserwindow.cpp` 很大，需分段读取。
+2. 用 `edit` 写含反斜杠转义（如 C++ 字面量里的 `\n`）的代码时，模板字符串可能把转义变成真实换行，
+   破坏 C++ 字符串。**建议用 `QLatin1Char(10)` / `QChar(10)` / `join` 等替代 `"\n"`**。
+3. Qt WebEngine API 差异：
+   - `iconForUrl` 已移除 → 用 `QWebEngineProfile::requestIconForPageURL`
+   - `certificateError` 是信号（非虚函数）
+   - `QWebEngineFindTextResult` 为 `findText` 回调参数
+   - `QUrl::queryItems()` 属于 `QUrlQuery`（需 `#include <QUrlQuery>`）
+4. 构建工具函数有超时限制；大文件编译慢，建议后台构建 + 轮询日志文件。
+5. 并发构建会因文件锁（`.d` 依赖文件、`.obj`）失败；启动新构建前确保没有残留的
+   `cmake`/`ninja` 进程。
+6. `.gitignore` 已忽略 `build/`、`*.log`、`*.pfx` 等，勿把构建产物或证书提交入库。
+
+---
+
+## 已修复的重要问题（历史记录，供维护参考）
+
+1. **历史记错 URL** —— 后台标签加载完成时曾用 `currentView()` 记录，改为按 `sender()` 定位。
+2. **进度条/导航按钮被后台标签污染** —— 已加 `sender() != currentView()` 判断。
+3. **数据写在程序目录** —— 已改用 `AppDataLocation`。
+4. **下载目录不可写** —— 已改用系统「下载」目录（并支持自定义）。
+5. **书签右键菜单误配** —— 已改用 `widgetForAction()` 精确取按钮。
+6. **下载映射悬空键** —— 已加 `destroyed` 连接清理。
+7. **新窗口请求未处理** —— 已重写 `createWindow()` + provider 回调。
 8. **工具栏用 Unicode 字符** —— 已换成 `QStyle` 标准图标。
 
-## 后续可扩展方向
+---
 
-- 历史记录按站点过滤 / 搜索高亮
-- 更完整的扩展机制（脚本元数据解析、@run-at 时机）
-- 同步口令强度增强（当前为 SHA-256 派生 + 流加密，非军用级）
+## 后续可扩展方向（另见 docs/ROADMAP.md）
+
+- 书签栏书签拖拽排序
 - 下载多线程分片
+- 完整扩展 API（chrome.storage / GM_xmlhttpRequest 等）
+- 更完整的用户脚本元数据与 `@require` 支持
 - 更多语言支持

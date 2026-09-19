@@ -33,6 +33,7 @@
 #include <QTextEdit>
 #include <QUrl>
 #include <QUrlQuery>
+#include <QUuid>
 #include <QVBoxLayout>
 
 ToolboxDialog::ToolboxDialog(QWidget *parent)
@@ -326,6 +327,17 @@ QWidget *ToolboxDialog::createTimeTab()
     btnRow->addWidget(toTs);
     btnRow->addWidget(nowBtn);
     lay->addRow(btnRow);
+
+    auto *uuidRow = new QHBoxLayout;
+    auto *uuidEdit = new QLineEdit(w);
+    uuidEdit->setPlaceholderText(QStringLiteral("UUID…"));
+    auto *uuidBtn = new QPushButton(QStringLiteral("生成 UUID"), w);
+    uuidRow->addWidget(uuidEdit, 1);
+    uuidRow->addWidget(uuidBtn);
+    lay->addRow(uuidRow);
+    connect(uuidBtn, &QPushButton::clicked, w, [uuidEdit]() {
+        uuidEdit->setText(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    });
 
     connect(toDate, &QPushButton::clicked, w, [tsEdit, dateEdit]() {
         const qint64 ts = tsEdit->text().trimmed().toLongLong();
