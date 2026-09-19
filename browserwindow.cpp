@@ -1731,6 +1731,19 @@ void BrowserWindow::onTabBarContextMenu(const QPoint &pos)
         connect(actDuplicate, &QAction::triggered, this, [this, view]() {
             createTab(view->url(), true);
         });
+        QAction *actBookmark = menu.addAction(QStringLiteral("添加此标签到书签"));
+        connect(actBookmark, &QAction::triggered, this, [this, view]() {
+            const QUrl u = view->url();
+            if (!u.isValid() || u.isEmpty())
+                return;
+            Bookmark b;
+            b.url = u;
+            b.title = view->title().isEmpty() ? u.host() : view->title();
+            m_bookmarks.append(b);
+            saveBookmarks();
+            rebuildBookmarkBar();
+            statusBar()->showMessage(QStringLiteral("已添加书签"), 2000);
+        });
     }
     QAction *actReloadAll = menu.addAction(QStringLiteral("重新加载所有标签"));
     connect(actReloadAll, &QAction::triggered, this, [this]() {
