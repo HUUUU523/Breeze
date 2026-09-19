@@ -82,9 +82,23 @@ DownloadManager::DownloadManager(QWidget *parent)
 
     layout->addWidget(m_table);
 
+    auto *pauseAllBtn = new QPushButton(QStringLiteral("全部暂停"), this);
+    auto *resumeAllBtn = new QPushButton(QStringLiteral("全部继续"), this);
     auto *clearBtn = new QPushButton(QStringLiteral("清空已完成记录"), this);
     auto *closeBtn = new QPushButton(QStringLiteral("关闭"), this);
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::hide);
+    connect(pauseAllBtn, &QPushButton::clicked, this, [this]() {
+        for (auto it = m_rows.constBegin(); it != m_rows.constEnd(); ++it) {
+            if (it.key() && it.key()->state() == QWebEngineDownloadRequest::DownloadInProgress)
+                it.key()->pause();
+        }
+    });
+    connect(resumeAllBtn, &QPushButton::clicked, this, [this]() {
+        for (auto it = m_rows.constBegin(); it != m_rows.constEnd(); ++it) {
+            if (it.key() && it.key()->isPaused())
+                it.key()->resume();
+        }
+    });
     connect(clearBtn, &QPushButton::clicked, this, [this]() {
         if (QMessageBox::question(this, QStringLiteral("清空记录"),
                 QStringLiteral("清空已完成/已取消的下载记录？（不影响已下载的文件）"))
@@ -117,6 +131,8 @@ DownloadManager::DownloadManager(QWidget *parent)
         }
     });
     auto *bottom = new QHBoxLayout;
+    bottom->addWidget(pauseAllBtn);
+    bottom->addWidget(resumeAllBtn);
     bottom->addWidget(clearBtn);
     bottom->addStretch();
     bottom->addWidget(closeBtn);
