@@ -51,6 +51,10 @@ public:
     static int     defaultFontSize();
     static void    setDefaultFontSize(int px);
 
+    // 启动时检查更新
+    static bool    checkUpdateOnStartup();
+    static void    setCheckUpdateOnStartup(bool enabled);
+
     // 启动行为：0=恢复上次会话，1=打开主页
     static int     startupBehavior();
     static void    setStartupBehavior(int mode);
@@ -77,6 +81,7 @@ private:
     QSpinBox  *m_speedLimitSpin = nullptr;
     QSpinBox  *m_minFontSpin    = nullptr;
     QSpinBox  *m_defFontSpin    = nullptr;
+    QCheckBox *m_checkUpdateCheck = nullptr;
     QLineEdit *m_downloadDirEdit = nullptr;
     QComboBox *m_startupCombo   = nullptr;
     QComboBox *m_newTabCombo    = nullptr;

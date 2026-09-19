@@ -51,6 +51,9 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_historyCheck = new QCheckBox(QStringLiteral("记录浏览历史"), this);
     form->addRow(QString(), m_historyCheck);
 
+    m_checkUpdateCheck = new QCheckBox(QStringLiteral("启动时检查更新"), this);
+    form->addRow(QString(), m_checkUpdateCheck);
+
     m_startupCombo = new QComboBox(this);
     m_startupCombo->addItem(QStringLiteral("恢复上次会话"), 0);
     m_startupCombo->addItem(QStringLiteral("打开主页"), 1);
@@ -152,6 +155,7 @@ void SettingsDialog::load()
     m_homeEdit->setText(homePage());
     m_engineCombo->setCurrentText(searchEngine());
     m_historyCheck->setChecked(recordHistory());
+    m_checkUpdateCheck->setChecked(checkUpdateOnStartup());
     m_startupCombo->setCurrentIndex(startupBehavior() == 1 ? 1 : 0);
     m_newTabCombo->setCurrentIndex(qBound(0, newTabBehavior(), 2));
     m_minFontSpin->setValue(minFontSize());
@@ -173,6 +177,7 @@ void SettingsDialog::onAccepted()
     setHomePage(m_homeEdit->text().trimmed());
     setSearchEngine(m_engineCombo->currentText());
     setRecordHistory(m_historyCheck->isChecked());
+    setCheckUpdateOnStartup(m_checkUpdateCheck->isChecked());
     setStartupBehavior(m_startupCombo->currentData().toInt());
     setNewTabBehavior(m_newTabCombo->currentData().toInt());
     setMinFontSize(m_minFontSpin->value());
@@ -325,6 +330,18 @@ void SettingsDialog::setDefaultFontSize(int px)
 {
     QSettings s(kOrg, kApp);
     s.setValue(QStringLiteral("web/defaultFontSize"), qMax(0, px));
+}
+
+bool SettingsDialog::checkUpdateOnStartup()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("update/checkOnStartup"), false).toBool();
+}
+
+void SettingsDialog::setCheckUpdateOnStartup(bool enabled)
+{
+    QSettings s(kOrg, kApp);
+    s.setValue(QStringLiteral("update/checkOnStartup"), enabled);
 }
 
 int SettingsDialog::startupBehavior()

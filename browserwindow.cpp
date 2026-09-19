@@ -99,6 +99,10 @@ BrowserWindow::BrowserWindow(QWidget *parent)
     // 启动时恢复上次会话；若无会话则打开主页
     restoreSession();
 
+    // 启动时检查更新（静默：仅在有新版本时提示）
+    if (SettingsDialog::checkUpdateOnStartup())
+        checkForUpdates(true);
+
     resize(1280, 800);
     setWindowTitle(QStringLiteral("Breeze ") + QStringLiteral(BREEZE_VERSION));
 
@@ -2026,12 +2030,13 @@ void BrowserWindow::refreshUrlCompleter(const QString &prefix)
     m_completer->setModel(model);
 }
 
-void BrowserWindow::checkForUpdates()
+void BrowserWindow::checkForUpdates(bool silent)
 {
     if (!m_updateManager)
         m_updateManager = new UpdateManager(this);
 
-    statusBar()->showMessage(QStringLiteral("正在检查更新…"), 3000);
+    if (!silent)
+        statusBar()->showMessage(QStringLiteral("正在检查更新…"), 3000);
 
     // 避免重复连接
     static bool connected = false;
@@ -2046,15 +2051,18 @@ void BrowserWindow::checkForUpdates()
                 });
         connect(m_updateManager, &UpdateManager::upToDate, this,
                 [this](const QString &v) {
+                    if (m_silentUpdateCheck) return;
                     QMessageBox::information(this, QStringLiteral("检查更新"),
                         QStringLiteral("已是最新版本 %1。").arg(v));
                 });
         connect(m_updateManager, &UpdateManager::checkFailed, this,
                 [this](const QString &err) {
+                    if (m_silentUpdateCheck) return;
                     QMessageBox::warning(this, QStringLiteral("检查更新失败"), err);
                 });
     }
 
+    m_silentUpdateCheck = silent;
     m_updateManager->checkForUpdates();
 }
 

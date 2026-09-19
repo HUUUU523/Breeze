@@ -147,7 +147,7 @@ private slots:
     void showSyncDialog();
 
     // ---- 更新 ----
-    void checkForUpdates();
+    void checkForUpdates(bool silent = false);
 
     // ---- AI 侧边栏 ----
     void toggleAiSidebar();
@@ -277,6 +277,7 @@ private:
     // ---- 子系统 ----
     DownloadManager   *m_downloadManager = nullptr;
     class UpdateManager *m_updateManager = nullptr;
+    bool m_silentUpdateCheck = false;
     AdBlocker         *m_adBlocker       = nullptr;
     HistoryDialog     *m_historyDialog   = nullptr;
     QWebEngineProfile *m_privateProfile  = nullptr;
