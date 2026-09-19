@@ -20,6 +20,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QSpinBox>
@@ -43,6 +44,7 @@ ToolboxDialog::ToolboxDialog(QWidget *parent)
     tabs->addTab(createUnitTab(),     QStringLiteral("📏 单位"));
     tabs->addTab(createQrTab(),       QStringLiteral("📱 二维码"));
     tabs->addTab(createHashTab(),     QStringLiteral("🔐 哈希"));
+    tabs->addTab(createTextStatTab(), QStringLiteral("📊 文本统计"));
     layout->addWidget(tabs);
 
     auto *closeBtn = new QPushButton(QStringLiteral("关闭"), this);
@@ -475,5 +477,36 @@ QWidget *ToolboxDialog::createHashTab()
     });
 
     v->addStretch();
+    return w;
+}
+
+QWidget *ToolboxDialog::createTextStatTab()
+{
+    auto *w = new QWidget;
+    auto *v = new QVBoxLayout(w);
+
+    auto *input = new QTextEdit(w);
+    input->setPlaceholderText(QStringLiteral("粘贴文本，实时统计…"));
+    v->addWidget(input, 1);
+
+    auto *stat = new QLabel(w);
+    stat->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    v->addWidget(stat);
+
+    auto update = [input, stat]() {
+        const QString text = input->toPlainText();
+        const int chars     = text.size();
+        const int noSpaces  = text.count(QRegularExpression(QStringLiteral("\\S")));
+        const int lines     = text.isEmpty() ? 0 : text.count(QLatin1Char('\n')) + 1;
+        const int words     = text.split(QRegularExpression(QStringLiteral("\\s+")),
+                                         Qt::SkipEmptyParts).size();
+        // 中文按字符计，英文按空格分词
+        const int cjk = text.count(QRegularExpression(QStringLiteral("[\\x{4e00}-\\x{9fff}]")));
+        stat->setText(QStringLiteral("字符：%1  ｜  不含空格：%2  ｜  行：%3  ｜  词：%4  ｜  汉字：%5")
+                          .arg(chars).arg(noSpaces).arg(lines).arg(words).arg(cjk));
+    };
+    QObject::connect(input, &QTextEdit::textChanged, w, update);
+    update();
+
     return w;
 }
