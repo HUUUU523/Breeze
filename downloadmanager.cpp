@@ -436,12 +436,22 @@ void DownloadManager::addDownload(QWebEngineDownloadRequest *download)
     auto *cancelBtn = new QPushButton(QStringLiteral("取消"), btnWidget);
     auto *openDirBtn = new QPushButton(QStringLiteral("文件夹"), btnWidget);
     auto *copyUrlBtn = new QPushButton(QStringLiteral("链接"), btnWidget);
+    auto *retryBtn  = new QPushButton(QStringLiteral("重试"), btnWidget);
     btnLayout->addWidget(pauseBtn);
     btnLayout->addWidget(cancelBtn);
+    btnLayout->addWidget(retryBtn);
     btnLayout->addWidget(openDirBtn);
     btnLayout->addWidget(copyUrlBtn);
     connect(copyUrlBtn, &QPushButton::clicked, this, [download]() {
         QApplication::clipboard()->setText(download->url().toString());
+    });
+    connect(retryBtn, &QPushButton::clicked, this, [this, download]() {
+        const QUrl u = download->url();
+        const QString dir = download->downloadDirectory();
+        const QString name = download->downloadFileName();
+        if (!u.isValid() || dir.isEmpty() || name.isEmpty())
+            return;
+        startResumableDownload(u, dir + QLatin1Char('/') + name);
     });
     m_table->setCellWidget(row, 3, btnWidget);
 
