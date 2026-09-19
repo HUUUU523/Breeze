@@ -25,6 +25,7 @@ private:
     QWidget *createQrTab();
     QWidget *createHashTab();
     QWidget *createTextStatTab();
+    QWidget *createRegexTab();
 
     // 二维码：用 QPainter 画（不依赖第三方库）
     static QPixmap makeQrPixmap(const QString &text, int size = 260);

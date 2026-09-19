@@ -22,7 +22,6 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QRandomGenerator>
-#include <QRegularExpression>
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QTextEdit>
@@ -45,6 +44,7 @@ ToolboxDialog::ToolboxDialog(QWidget *parent)
     tabs->addTab(createQrTab(),       QStringLiteral("📱 二维码"));
     tabs->addTab(createHashTab(),     QStringLiteral("🔐 哈希"));
     tabs->addTab(createTextStatTab(), QStringLiteral("📊 文本统计"));
+    tabs->addTab(createRegexTab(),    QStringLiteral("🔍 正则测试"));
     layout->addWidget(tabs);
 
     auto *closeBtn = new QPushButton(QStringLiteral("关闭"), this);
@@ -507,6 +507,77 @@ QWidget *ToolboxDialog::createTextStatTab()
     };
     QObject::connect(input, &QTextEdit::textChanged, w, update);
     update();
+
+    return w;
+}
+
+QWidget *ToolboxDialog::createRegexTab()
+{
+    auto *w = new QWidget;
+    auto *v = new QVBoxLayout(w);
+
+    auto *pattern = new QLineEdit(w);
+    pattern->setPlaceholderText(QStringLiteral("正则表达式，如 \\d+"));
+    v->addWidget(pattern);
+
+    auto *flagsRow = new QHBoxLayout;
+    auto *caseInsensitive = new QCheckBox(QStringLiteral("忽略大小写 (i)"), w);
+    auto *multiLine       = new QCheckBox(QStringLiteral("多行 (m)"), w);
+    flagsRow->addWidget(caseInsensitive);
+    flagsRow->addWidget(multiLine);
+    flagsRow->addStretch();
+    v->addLayout(flagsRow);
+
+    auto *input = new QTextEdit(w);
+    input->setPlaceholderText(QStringLiteral("在此粘贴待测试文本…"));
+    v->addWidget(input, 1);
+
+    auto *result = new QTextEdit(w);
+    result->setReadOnly(true);
+    result->setPlaceholderText(QStringLiteral("匹配结果…"));
+    v->addWidget(result, 1);
+
+    auto update = [pattern, caseInsensitive, multiLine, input, result]() {
+        const QString p = pattern->text();
+        if (p.isEmpty()) {
+            result->clear();
+            return;
+        }
+        QRegularExpression::PatternOptions opts = QRegularExpression::NoPatternOption;
+        if (caseInsensitive->isChecked())
+            opts |= QRegularExpression::CaseInsensitiveOption;
+        if (multiLine->isChecked())
+            opts |= QRegularExpression::MultilineOption;
+        const QRegularExpression re(p, opts);
+        if (!re.isValid()) {
+            result->setPlainText(QStringLiteral("正则无效：%1").arg(re.errorString()));
+            return;
+        }
+        const QString text = input->toPlainText();
+        QStringList out;
+        auto it = re.globalMatch(text);
+        int n = 0;
+        while (it.hasNext()) {
+            const QRegularExpressionMatch m = it.next();
+            ++n;
+            QStringList caps;
+            caps << QStringLiteral("[%1] %2").arg(n).arg(m.captured(0));
+            for (int i = 1; i <= m.lastCapturedIndex(); ++i) {
+                if (!m.captured(i).isNull())
+                    caps << QStringLiteral("    $%1 = %2").arg(i).arg(m.captured(i));
+            }
+            out << caps.join(QLatin1Char(10));
+        }
+        result->setPlainText(out.isEmpty()
+            ? QStringLiteral("无匹配")
+            : QStringLiteral("共 %1 处匹配：").arg(n)
+                  + QString(QChar(10)) + QString(QChar(10))
+                  + out.join(QString(QChar(10))));
+    };
+    QObject::connect(pattern, &QLineEdit::textChanged, w, update);
+    QObject::connect(input, &QTextEdit::textChanged, w, update);
+    QObject::connect(caseInsensitive, &QCheckBox::toggled, w, update);
+    QObject::connect(multiLine, &QCheckBox::toggled, w, update);
 
     return w;
 }
