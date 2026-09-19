@@ -1645,8 +1645,27 @@ void BrowserWindow::onReopenClosedTab()
 void BrowserWindow::onTabBarContextMenu(const QPoint &pos)
 {
     const int index = m_tabs->tabBar()->tabAt(pos);
-    if (index < 0)
+    if (index < 0) {
+        // 空白处右键 → 最近关闭的标签
+        if (m_closedTabs.isEmpty())
+            return;
+        QMenu menu(this);
+        for (int i = 0; i < m_closedTabs.size() && i < 10; ++i) {
+            const QUrl u = m_closedTabs.at(i);
+            QAction *a = menu.addAction(
+                QStringLiteral("%1  %2").arg(i + 1).arg(u.toString()));
+            connect(a, &QAction::triggered, this, [this, i]() {
+                if (i < m_closedTabs.size()) {
+                    const QUrl u = m_closedTabs.takeAt(i);
+                    createTab(u, true);
+                }
+            });
+        }
+        menu.addSeparator();
+        menu.addAction(QStringLiteral("清除列表"), this, [this]() { m_closedTabs.clear(); });
+        menu.exec(m_tabs->tabBar()->mapToGlobal(pos));
         return;
+    }
     auto *view = qobject_cast<WebView *>(m_tabs->widget(index));
 
     QMenu menu(this);
