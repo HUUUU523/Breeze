@@ -1,6 +1,7 @@
 #include "downloadmanager.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QElapsedTimer>
 #include <memory>
 #include <QSettings>
@@ -412,9 +413,14 @@ void DownloadManager::addDownload(QWebEngineDownloadRequest *download)
     auto *pauseBtn = new QPushButton(QStringLiteral("暂停"), btnWidget);
     auto *cancelBtn = new QPushButton(QStringLiteral("取消"), btnWidget);
     auto *openDirBtn = new QPushButton(QStringLiteral("文件夹"), btnWidget);
+    auto *copyUrlBtn = new QPushButton(QStringLiteral("链接"), btnWidget);
     btnLayout->addWidget(pauseBtn);
     btnLayout->addWidget(cancelBtn);
     btnLayout->addWidget(openDirBtn);
+    btnLayout->addWidget(copyUrlBtn);
+    connect(copyUrlBtn, &QPushButton::clicked, this, [download]() {
+        QApplication::clipboard()->setText(download->url().toString());
+    });
     m_table->setCellWidget(row, 3, btnWidget);
 
     connect(pauseBtn, &QPushButton::clicked, this, [download, pauseBtn]() {
