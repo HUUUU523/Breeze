@@ -3,6 +3,7 @@
 
 #include <algorithm>
 
+#include <QDesktopServices>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLineEdit>
@@ -45,6 +46,14 @@ BookmarkManager::BookmarkManager(QWidget *parent)
                 QTreeWidgetItem *item = m_tree->itemAt(pos);
                 QMenu menu;
                 if (item) {
+                    const int idx = item->data(0, Qt::UserRole).toInt();
+                    if (idx >= 0 && m_bookmarks && idx < m_bookmarks->size()) {
+                        const QUrl u = m_bookmarks->at(idx).url;
+                        menu.addAction(QStringLiteral("打开"), this, [u]() {
+                            QDesktopServices::openUrl(u);
+                        });
+                        menu.addSeparator();
+                    }
                     menu.addAction(QStringLiteral("重命名"), this, &BookmarkManager::onRenameSelected);
                     menu.addAction(QStringLiteral("删除"), this, &BookmarkManager::onRemoveSelected);
                 }
