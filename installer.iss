@@ -1,6 +1,6 @@
 ; Breeze 安装程序脚本（Inno Setup 6）
 #define MyAppName "Breeze"
-#define MyAppVersion "2.4.0"
+#define MyAppVersion "2.4.1"
 #define MyAppPublisher "HUUUU523"
 #define MyAppURL "https://github.com/HUUUU523/Breeze"
 #define MyAppExeName "Breeze.exe"
