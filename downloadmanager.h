@@ -54,6 +54,7 @@ private:
     QHash<QWebEngineDownloadRequest *, int> m_rows;
     QList<DownloadRecord> m_records;
     QNetworkAccessManager *m_net = nullptr;
+    QHash<QString, int> m_retryCount;   // savePath -> 已重试次数
 };
 
 #endif // DOWNLOADMANAGER_H

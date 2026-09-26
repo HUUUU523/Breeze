@@ -178,10 +178,14 @@ void DownloadManager::startResumableDownload(const QUrl &url, const QString &sav
         existing = f.size();
 
     QNetworkRequest req(url);
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                     QNetworkRequest::NoLessSafeRedirectPolicy);
     if (existing > 0)
         req.setRawHeader("Range", QByteArray("bytes=") + QByteArray::number(existing) + "-");
 
     QNetworkReply *reply = m_net->get(req);
+    // 增大读缓冲，减少小包写盘次数（对大文件更友好）
+    reply->setReadBufferSize(1024 * 1024);
 
     // 表格行
     const int row = m_table->rowCount();
@@ -246,11 +250,27 @@ void DownloadManager::startResumableDownload(const QUrl &url, const QString &sav
             });
 
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, out, savePath, name]() {
+            [this, reply, out, savePath, name, url, existing]() {
                 out->close();
                 out->deleteLater();
                 const bool ok = (reply->error() == QNetworkReply::NoError);
+                const bool canceled =
+                    (reply->error() == QNetworkReply::OperationCanceledError);
                 reply->deleteLater();
+
+                // 中断（非取消、非完成）时自动重试续传，最多 3 次
+                if (!ok && !canceled) {
+                    const int tries = m_retryCount.value(savePath, 0);
+                    if (tries < 3) {
+                        m_retryCount.insert(savePath, tries + 1);
+                        // 稍后重试（利用已有文件续传）
+                        QTimer::singleShot(1500, this, [this, url, savePath]() {
+                            startResumableDownload(url, savePath);
+                        });
+                        return;
+                    }
+                    m_retryCount.remove(savePath);
+                }
 
                 DownloadRecord rec;
                 rec.fileName = name;
