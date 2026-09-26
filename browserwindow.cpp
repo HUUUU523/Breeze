@@ -2619,12 +2619,16 @@ void BrowserWindow::aiTranslatePage()
                                      QStringLiteral("页面没有可提取的正文。"));
             return;
         }
-        AiDialog dlg(this);
-        dlg.askWithPrompt(
-            QStringLiteral("请把以下网页内容翻译成简体中文（若原文已是中文则翻译成英文）。"
-                           "保留段落结构，直接输出译文：\n\n")
-            + text);
-        dlg.exec();
+        // 在侧边栏中翻译（长文更适合侧边面板）
+        if (!m_aiSidebar) {
+            m_aiSidebar = new AiSidebar(this);
+            addDockWidget(Qt::RightDockWidgetArea, m_aiSidebar);
+        }
+        m_aiSidebar->show();
+        m_aiSidebar->setPageContext(currentView() ? currentView()->title() : QString(),
+                                    text.left(8000));
+        m_aiSidebar->askWithPrompt(
+            QStringLiteral("请把当前网页正文翻译成简体中文（若原文已是中文则翻译成英文）。保留段落结构，直接输出译文。"));
     });
 }
 

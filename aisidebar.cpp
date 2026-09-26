@@ -64,6 +64,36 @@ void AiSidebar::setPageContext(const QString &title, const QString &text)
             .arg(title.toHtmlEscaped()));
 }
 
+void AiSidebar::askWithPrompt(const QString &prompt)
+{
+    if (m_busy)
+        return;
+    const QString text = prompt.trimmed();
+    if (text.isEmpty())
+        return;
+
+    QString payload = text;
+    if (!m_pageText.isEmpty() && m_messages.isEmpty()) {
+        const QChar nl(10);
+        payload = QStringLiteral("以下是当前网页《%1》的正文：").arg(m_pageTitle)
+            + nl + nl + m_pageText.left(6000) + nl + nl + text;
+    }
+
+    QJsonObject userMsg;
+    userMsg.insert(QStringLiteral("role"), QStringLiteral("user"));
+    userMsg.insert(QStringLiteral("content"), payload);
+    m_messages.append(userMsg);
+
+    appendBubble(QStringLiteral("你"), text, true);
+
+    m_busy = true;
+    m_sendBtn->setEnabled(false);
+    m_sendBtn->setText(QStringLiteral("思考中…"));
+    m_streaming.clear();
+
+    m_ai->chatStream(m_messages);
+}
+
 void AiSidebar::appendBubble(const QString &who, const QString &text, bool isUser)
 {
     const QString color = isUser ? QStringLiteral("#3a6ea5") : QStringLiteral("#555");

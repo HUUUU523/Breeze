@@ -20,6 +20,9 @@ public:
     // 设置当前页正文（作为后续提问的上下文）
     void setPageContext(const QString &title, const QString &text);
 
+    // 直接以指定 prompt 发起一次对话（用于"翻译整页"等快捷动作）
+    void askWithPrompt(const QString &prompt);
+
 signals:
     // 请求获取当前页正文（由主窗口响应并回填 setPageContext）
     void pageContextRequested();
