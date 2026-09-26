@@ -736,6 +736,7 @@ void BrowserWindow::rebuildBookmarkBar()
                 if (!ico.isNull())
                     a->setIcon(ico);
             } else {
+                a->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
                 QWebEngineProfile::defaultProfile()->requestIconForPageURL(
                     url, 16, [this, a, urlKey](const QIcon &icon, const QUrl &, const QUrl &) {
                         if (!icon.isNull()) {
@@ -772,6 +773,7 @@ void BrowserWindow::rebuildBookmarkBar()
                 if (!ico.isNull())
                     a->setIcon(ico);
             } else {
+                a->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
                 QWebEngineProfile::defaultProfile()->requestIconForPageURL(
                     url, 16, [this, a, urlKey](const QIcon &icon, const QUrl &, const QUrl &) {
                         if (!icon.isNull()) {
@@ -834,6 +836,8 @@ void BrowserWindow::addBookmarkAction(const Bookmark &b, QToolBar *bar)
         if (!ico.isNull())
             act->setIcon(ico);
     } else {
+        // 先设默认图标，避免无图标时的空白
+        act->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
         QWebEngineProfile::defaultProfile()->requestIconForPageURL(
             url, 16, [this, act, urlKey](const QIcon &icon, const QUrl &, const QUrl &) {
                 if (!icon.isNull()) {
