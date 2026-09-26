@@ -240,6 +240,61 @@ void BrowserWindow::initExtensionBackground()
     });
 }
 
+void BrowserWindow::buildExtensionButtons(QToolBar *navBar)
+{
+    const QList<Extension> exts = ExtensionManager::loadAll();
+    for (const Extension &ext : exts) {
+        if (!ext.hasAction)
+            continue;
+        auto *btn = new QToolButton(this);
+        btn->setToolTip(ext.actionTitle.isEmpty() ? ext.name : ext.actionTitle);
+        btn->setAutoRaise(true);
+        // 加载图标
+        if (!ext.actionIcon.isEmpty()) {
+            const QString iconPath = ext.dir + QLatin1Char('/') + ext.actionIcon;
+            QIcon ico(iconPath);
+            if (!ico.isNull())
+                btn->setIcon(ico);
+        }
+        if (btn->icon().isNull())
+            btn->setText(ext.name.left(2));
+        btn->setIconSize(QSize(18, 18));
+        const Extension captured = ext;
+        connect(btn, &QToolButton::clicked, this, [this, captured]() {
+            showExtensionPopup(captured);
+        });
+        navBar->addWidget(btn);
+    }
+}
+
+void BrowserWindow::showExtensionPopup(const Extension &ext)
+{
+    if (ext.actionPopup.isEmpty()) {
+        statusBar()->showMessage(
+            QStringLiteral("扩展「%1」没有 popup").arg(ext.name), 2000);
+        return;
+    }
+    const QString popupPath = ext.dir + QLatin1Char('/') + ext.actionPopup;
+    if (!QFile::exists(popupPath)) {
+        statusBar()->showMessage(QStringLiteral("找不到 popup 文件"), 2000);
+        return;
+    }
+    // 弹出一个无边框小窗口展示 popup.html
+    auto *dlg = new QDialog(this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->setWindowTitle(ext.actionTitle.isEmpty() ? ext.name : ext.actionTitle);
+    dlg->resize(360, 480);
+    auto *lay = new QVBoxLayout(dlg);
+    lay->setContentsMargins(0, 0, 0, 0);
+    auto *pv = new WebView(dlg);
+    lay->addWidget(pv);
+    // popup 也注入扩展 shim，便于调用 chrome.*
+    QFile f(popupPath);
+    if (f.open(QIODevice::ReadOnly))
+        pv->setHtml(QString::fromUtf8(f.readAll()), QUrl::fromLocalFile(popupPath));
+    dlg->show();
+}
+
 void BrowserWindow::notifyPreviousCrash()
 {
     // 延迟到事件循环启动后再弹，确保窗口已显示
@@ -589,6 +644,9 @@ void BrowserWindow::setupActions()
     m_actSettings = mainMenu->addAction(QStringLiteral("设置…"));
     QAction *actQuit = mainMenu->addAction(QStringLiteral("退出"));
     actQuit->setShortcut(QKeySequence(QStringLiteral("Ctrl+Q")));
+
+    // 扩展工具栏按钮（每个带 action 的扩展一个图标）
+    buildExtensionButtons(navBar);
 
     menuBtn->setMenu(mainMenu);
     navBar->addWidget(menuBtn);

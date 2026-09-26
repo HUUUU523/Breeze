@@ -125,6 +125,10 @@ public:
     // 初始化扩展 background 页（隐藏页，注入 background 脚本）
     void initExtensionBackground();
 
+    // 扩展工具栏按钮 + popup
+    void buildExtensionButtons(class QToolBar *navBar);
+    void showExtensionPopup(const struct Extension &ext);
+
 protected:
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *obj, QEvent *event) override;
