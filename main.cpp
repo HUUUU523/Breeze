@@ -10,6 +10,20 @@
 
 int main(int argc, char *argv[])
 {
+    // DNS over HTTPS：必须在 QApplication 构造前通过 Chromium 标志注入
+    {
+        const QString doh = SettingsDialog::dohTemplate();
+        if (!doh.isEmpty()) {
+            const QByteArray flag =
+                QByteArrayLiteral("--dns-over-https-templates=") + doh.toUtf8();
+            QByteArray cur = qgetenv("QTWEBENGINE_CHROMIUM_FLAGS");
+            if (!cur.isEmpty())
+                cur += ' ';
+            cur += flag;
+            qputenv("QTWEBENGINE_CHROMIUM_FLAGS", cur);
+        }
+    }
+
     // Qt6 WebEngine：Chromium 要求先构造 QApplication 再做相关设置
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("Breeze"));

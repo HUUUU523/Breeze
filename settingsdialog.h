@@ -55,6 +55,10 @@ public:
     static bool    openFileAfterDownload();
     static void    setOpenFileAfterDownload(bool on);
 
+    // DNS over HTTPS 模板（空 = 关闭）
+    static QString dohTemplate();
+    static void    setDohTemplate(const QString &tpl);
+
     // 启动时检查更新
     static bool    checkUpdateOnStartup();
     static void    setCheckUpdateOnStartup(bool enabled);
@@ -85,6 +89,7 @@ private:
     QSpinBox  *m_speedLimitSpin = nullptr;
     QSpinBox  *m_minFontSpin    = nullptr;
     QSpinBox  *m_defFontSpin    = nullptr;
+    QLineEdit *m_dohEdit        = nullptr;
     QCheckBox *m_checkUpdateCheck = nullptr;
     QCheckBox *m_openAfterDlCheck = nullptr;
     QLineEdit *m_downloadDirEdit = nullptr;

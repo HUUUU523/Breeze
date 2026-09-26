@@ -81,6 +81,10 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_openAfterDlCheck = new QCheckBox(QStringLiteral("下载完成后自动打开文件"), this);
     form->addRow(QString(), m_openAfterDlCheck);
 
+    m_dohEdit = new QLineEdit(this);
+    m_dohEdit->setPlaceholderText(QStringLiteral("https://dns.google/dns-query（留空则关闭）"));
+    form->addRow(QStringLiteral("DNS over HTTPS："), m_dohEdit);
+
     layout->addLayout(form);
 
     // ---- 代理 ----
@@ -164,6 +168,7 @@ void SettingsDialog::load()
     m_newTabCombo->setCurrentIndex(qBound(0, newTabBehavior(), 2));
     m_minFontSpin->setValue(minFontSize());
     m_openAfterDlCheck->setChecked(openFileAfterDownload());
+    m_dohEdit->setText(dohTemplate());
     m_defFontSpin->setValue(defaultFontSize());
 
     const QString pt = proxyType();
@@ -187,6 +192,7 @@ void SettingsDialog::onAccepted()
     setNewTabBehavior(m_newTabCombo->currentData().toInt());
     setMinFontSize(m_minFontSpin->value());
     setOpenFileAfterDownload(m_openAfterDlCheck->isChecked());
+    setDohTemplate(m_dohEdit->text());
     setDefaultFontSize(m_defFontSpin->value());
     setDownloadSpeedLimit(m_speedLimitSpin->value());
     setDownloadDirectory(m_downloadDirEdit->text());
@@ -324,6 +330,18 @@ void SettingsDialog::setOpenFileAfterDownload(bool on)
 {
     QSettings s(kOrg, kApp);
     s.setValue(QStringLiteral("download/openAfterFinish"), on);
+}
+
+QString SettingsDialog::dohTemplate()
+{
+    QSettings s(kOrg, kApp);
+    return s.value(QStringLiteral("net/dohTemplate")).toString();
+}
+
+void SettingsDialog::setDohTemplate(const QString &tpl)
+{
+    QSettings s(kOrg, kApp);
+    s.setValue(QStringLiteral("net/dohTemplate"), tpl.trimmed());
 }
 
 int SettingsDialog::minFontSize()
