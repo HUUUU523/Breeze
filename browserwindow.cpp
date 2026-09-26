@@ -806,9 +806,31 @@ void BrowserWindow::rebuildBookmarkBar()
             connect(a, &QAction::triggered, this, [this, url]{ openBookmark(url); });
         }
         auto *btn = new QToolButton(m_bookmarkBar);
-        btn->setText(QStringLiteral("📁 ") + g);
+        btn->setText(g);
+        btn->setToolTip(QStringLiteral("分组：%1").arg(g));
         btn->setMenu(menu);
         btn->setPopupMode(QToolButton::InstantPopup);
+        // 用该组第一个书签的 favicon 作为分组图标（无则回退文件夹图标）
+        QUrl firstUrl;
+        for (const Bookmark &b : m_bookmarks) {
+            if (b.group == g) { firstUrl = b.url; break; }
+        }
+        if (firstUrl.isValid()) {
+            const QString key = firstUrl.toString();
+            if (m_faviconCache.contains(key) && !m_faviconCache.value(key).isNull()) {
+                btn->setIcon(m_faviconCache.value(key));
+                btn->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+            } else {
+                QWebEngineProfile::defaultProfile()->requestIconForPageURL(
+                    firstUrl, 16, [this, btn, key](const QIcon &icon, const QUrl &, const QUrl &) {
+                        if (!icon.isNull()) {
+                            m_faviconCache.insert(key, icon);
+                            btn->setIcon(icon);
+                            btn->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+                        }
+                    });
+            }
+        }
         m_bookmarkBar->addWidget(btn);
     }
 
