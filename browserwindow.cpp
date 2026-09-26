@@ -182,9 +182,6 @@ void BrowserWindow::migrateLegacyData()
 }
 
 
-void BreezePlaceholderDummy() {}
-
-
 void BrowserWindow::notifyPreviousCrash()
 {
     // 延迟到事件循环启动后再弹，确保窗口已显示
@@ -242,14 +239,22 @@ bool BrowserWindow::eventFilter(QObject *obj, QEvent *event)
         if (de->mimeData()->hasFormat(QStringLiteral("application/x-breeze-bookmark"))) {
             const QString srcUrl = QString::fromUtf8(
                 de->mimeData()->data(QStringLiteral("application/x-breeze-bookmark")));
-            // 找到 drop 位置的按钮，确定目标书签
             const QPoint pos = de->position().toPoint();
+            // 找到 drop 位置的 widget
             QWidget *target = m_bookmarkBar->childAt(pos);
-            while (target && !qobject_cast<BookmarkButton *>(target))
-                target = target->parentWidget();
-            const QUrl dstUrl = target
-                ? qobject_cast<BookmarkButton *>(target)->url()
-                : QUrl();
+            QString dstGroup;
+            QUrl dstUrl;
+            for (QWidget *w = target; w; w = w->parentWidget()) {
+                if (auto *bb = qobject_cast<BookmarkButton *>(w)) {
+                    dstUrl = bb->url();
+                    break;
+                }
+                const QVariant g = w->property("breezeGroupName");
+                if (g.isValid() && !g.toString().isEmpty()) {
+                    dstGroup = g.toString();
+                    break;
+                }
+            }
 
             const int from = [&]() {
                 for (int i = 0; i < m_bookmarks.size(); ++i)
@@ -257,19 +262,36 @@ bool BrowserWindow::eventFilter(QObject *obj, QEvent *event)
                         return i;
                 return -1;
             }();
-            int to = -1;
-            if (dstUrl.isValid()) {
-                for (int i = 0; i < m_bookmarks.size(); ++i) {
-                    if (m_bookmarks.at(i).url == dstUrl) {
-                        to = i;
-                        break;
-                    }
+            if (from < 0) {
+                de->acceptProposedAction();
+                return true;
+            }
+
+            if (!dstGroup.isEmpty()) {
+                // 拖到分组按钮 → 移入该分组
+                if (m_bookmarks.at(from).group != dstGroup) {
+                    m_bookmarks[from].group = dstGroup;
+                    saveBookmarks();
+                    rebuildBookmarkBar();
                 }
             } else {
-                to = m_bookmarks.size() - 1;   // 拖到空白处 → 移到末尾
-            }
-            if (from >= 0 && to >= 0 && from != to) {
-                m_bookmarks.move(from, to);
+                // 拖到书签上 → 重排；拖到空白 → 移出分组并置末尾
+                int to = -1;
+                if (dstUrl.isValid()) {
+                    for (int i = 0; i < m_bookmarks.size(); ++i) {
+                        if (m_bookmarks.at(i).url == dstUrl) { to = i; break; }
+                    }
+                    if (m_bookmarks.at(from).group != m_bookmarks.at(to).group) {
+                        // 跨分组：改为目标书签的分组
+                        m_bookmarks[from].group = m_bookmarks.at(to).group;
+                    }
+                } else {
+                    to = m_bookmarks.size() - 1;
+                    m_bookmarks[from].group.clear();   // 拖到空白 → 取消分组
+                }
+                if (to >= 0 && from != to) {
+                    m_bookmarks.move(from, to);
+                }
                 saveBookmarks();
                 rebuildBookmarkBar();
             }
@@ -818,6 +840,7 @@ void BrowserWindow::rebuildBookmarkBar()
             connect(a, &QAction::triggered, this, [this, url]{ openBookmark(url); });
         }
         auto *btn = new QToolButton(m_bookmarkBar);
+        btn->setProperty("breezeGroupName", g);   // 供拖放识别
         btn->setText(g);
         btn->setToolTip(QStringLiteral("分组：%1").arg(g));
         btn->setMenu(menu);
