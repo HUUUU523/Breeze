@@ -2619,6 +2619,22 @@ void BrowserWindow::injectExtensionScripts(WebView *view, const QUrl &url)
                 "remove:function(keys,cb){var arr=Array.isArray(keys)?keys:[keys];"
                 "arr.forEach(function(k){localStorage.removeItem('__breeze_ext_'+k);});"
                 "if(cb)cb();}};"
+                // chrome.runtime 最小子集
+                "window.chrome.runtime=window.chrome.runtime||{};"
+                "window.chrome.runtime.id='breeze-ext';"
+                "window.chrome.runtime.getURL=function(p){return p;};"
+                "window.chrome.runtime.sendMessage=function(){"
+                "console.log('[Breeze] chrome.runtime.sendMessage:',arguments);};"
+                "window.chrome.runtime.onMessage={addListener:function(){}};"
+                "window.chrome.runtime.lastError=undefined;"
+                // chrome.tabs 最小子集
+                "window.chrome.tabs=window.chrome.tabs||{};"
+                "window.chrome.tabs.query=function(q,cb){if(cb)cb([{"
+                "url:location.href,title:document.title,active:true}]);};"
+                "window.chrome.tabs.create=function(o,cb){"
+                "if(o&&o.url)window.open(o.url,'_blank');if(cb)cb({});};"
+                "window.chrome.tabs.sendMessage=function(){"
+                "console.log('[Breeze] chrome.tabs.sendMessage:',arguments);};"
                 "})();");
 
             QWebEngineScript qs;
