@@ -24,6 +24,9 @@ gh_login.txt
 
 # 构建日志（临时）
 build_log.txt
+bl2.txt
+cl_test.txt
+cl_bw.txt
 
 # 证书（切勿提交）
 *.pfx
