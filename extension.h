@@ -15,13 +15,20 @@ struct ContentScript {
     QString     runAt = QStringLiteral("document_idle");  // document_start / document_end / document_idle
 };
 
-// 一个已加载的扩展（最小模型：manifest + content_scripts + background）
+// 一个已加载的扩展（最小模型：manifest + content_scripts + background + action）
 struct Extension {
     QString name;
     QString version;
     QString dir;           // 扩展根目录（绝对路径）
     QList<ContentScript> contentScripts;
     QStringList backgroundScripts;   // background 脚本（相对扩展目录）
+
+    // action / browser_action（MV3 用 action，MV2 用 browser_action）
+    bool    hasAction = false;
+    QString actionTitle;   // default_title
+    QString actionIcon;    // default_icon（相对扩展目录的图片路径）
+    QString actionPopup;   // default_popup（相对扩展目录的 HTML 路径）
+
     bool enabled = true;
 };
 

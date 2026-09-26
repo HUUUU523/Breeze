@@ -116,6 +116,27 @@ Extension loadExtension(const QString &dir)
     }
     ext.backgroundScripts += toStringList(bg.value(QStringLiteral("scripts")));
 
+    // 解析 action（MV3）或 browser_action（MV2）
+    QJsonObject act = m.value(QStringLiteral("action")).toObject();
+    if (act.isEmpty())
+        act = m.value(QStringLiteral("browser_action")).toObject();
+    if (!act.isEmpty()) {
+        ext.hasAction = true;
+        ext.actionTitle = act.value(QStringLiteral("default_title")).toString();
+        ext.actionPopup = act.value(QStringLiteral("default_popup")).toString();
+        // default_icon 可能是字符串，也可能是 {size: path} 对象
+        const QJsonValue iconVal = act.value(QStringLiteral("default_icon"));
+        if (iconVal.isString())
+            ext.actionIcon = iconVal.toString();
+        else if (iconVal.isObject()) {
+            const QJsonObject icons = iconVal.toObject();
+            // 取第一个（或最小的）图标
+            for (auto it = icons.constBegin(); it != icons.constEnd(); ++it) {
+                if (it.value().isString()) { ext.actionIcon = it.value().toString(); break; }
+            }
+        }
+    }
+
     return ext;
 }
 
