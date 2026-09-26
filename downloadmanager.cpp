@@ -10,6 +10,7 @@
 #include <QTimer>
 #include <QStyle>
 #include "settingsdialog.h"
+#include "segmenteddownload.h"
 
 #include <QDesktopServices>
 #include <QDir>
@@ -177,6 +178,12 @@ void DownloadManager::startResumableDownload(const QUrl &url, const QString &sav
     if (f.exists())
         existing = f.size();
 
+    // 全新下载：交给多线程分片下载器（内部会 HEAD 探测，必要时回退单段）
+    if (existing == 0) {
+        startSegmentedDownload(url, savePath);
+        return;
+    }
+
     QNetworkRequest req(url);
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                      QNetworkRequest::NoLessSafeRedirectPolicy);
@@ -284,6 +291,51 @@ void DownloadManager::startResumableDownload(const QUrl &url, const QString &sav
                     qWarning("下载中断：%s", qPrintable(name));
             });
 }
+
+void DownloadManager::startSegmentedDownload(const QUrl &url, const QString &savePath)
+{
+    const int row = m_table->rowCount();
+    m_table->insertRow(row);
+    const QString name = QFileInfo(savePath).fileName();
+    m_table->setItem(row, 0, new QTableWidgetItem(name));
+    auto *bar = new QProgressBar(m_table);
+    bar->setRange(0, 100);
+    m_table->setCellWidget(row, 1, bar);
+    m_table->setItem(row, 2, new QTableWidgetItem(QStringLiteral("分片下载中")));
+    m_table->setItem(row, 3, new QTableWidgetItem(savePath));
+
+    auto *seg = new SegmentedDownload(url, savePath, 4, this);
+    connect(seg, &SegmentedDownload::progress, this,
+            [bar](qint64 recv, qint64 total) {
+                if (total > 0)
+                    bar->setValue(static_cast<int>(recv * 100 / total));
+            });
+    connect(seg, &SegmentedDownload::speed, this,
+            [this, row](qint64 bps) {
+                const double kb = bps / 1024.0;
+                if (auto *item = m_table->item(row, 2)) {
+                    item->setText(kb >= 1024
+                        ? QStringLiteral("%1 MB/s").arg(kb / 1024, 0, 'f', 1)
+                        : QStringLiteral("%1 KB/s").arg(kb, 0, 'f', 0));
+                }
+            });
+    connect(seg, &SegmentedDownload::finished, this,
+            [this, seg, savePath, name](bool ok, const QString &err) {
+                DownloadRecord rec;
+                rec.fileName = name;
+                rec.directory = QFileInfo(savePath).absolutePath();
+                rec.totalBytes = QFileInfo(savePath).size();
+                rec.startedAt = QDateTime::currentDateTime();
+                rec.status = ok ? QStringLiteral("已完成") : QStringLiteral("已中断");
+                appendRecord(rec);
+
+                if (!ok && !err.isEmpty())
+                    qWarning("分片下载失败：%s", qPrintable(err));
+                seg->deleteLater();
+            });
+    seg->start();
+}
+
 
 
 QString DownloadManager::recordsFilePath() const

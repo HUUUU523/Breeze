@@ -35,6 +35,8 @@ qt_add_executable(Breeze WIN32
     adblocker.cpp
     downloadmanager.h
     downloadmanager.cpp
+    segmenteddownload.h
+    segmenteddownload.cpp
     historymanager.h
     historymanager.cpp
     settingsdialog.h

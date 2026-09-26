@@ -36,6 +36,9 @@ public:
     // 用 QNetworkAccessManager 手动下载，支持断点续传
     void startResumableDownload(const QUrl &url, const QString &savePath);
 
+    // 多线程分片下载（HEAD 探测 → 多段 Range；不支持则回退单段）
+    void startSegmentedDownload(const QUrl &url, const QString &savePath);
+
 private slots:
     void onStateChanged();
 
