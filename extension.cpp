@@ -106,6 +106,16 @@ Extension loadExtension(const QString &dir)
             cs.runAt = ra;
         ext.contentScripts.append(cs);
     }
+
+    // 解析 background：支持 service_worker（单文件）或 scripts（数组）
+    const QJsonObject bg = m.value(QStringLiteral("background")).toObject();
+    if (bg.contains(QStringLiteral("service_worker"))) {
+        const QString sw = bg.value(QStringLiteral("service_worker")).toString();
+        if (!sw.isEmpty())
+            ext.backgroundScripts << sw;
+    }
+    ext.backgroundScripts += toStringList(bg.value(QStringLiteral("scripts")));
+
     return ext;
 }
 

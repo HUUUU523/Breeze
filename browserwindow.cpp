@@ -151,6 +151,9 @@ BrowserWindow::BrowserWindow(QWidget *parent)
     });
     m_sleepTimer->start();
 
+    // 扩展 background 页：注入到一个不可见的页面，用于事件监听/消息中转
+    initExtensionBackground();
+
     applyTheme();
 }
 
@@ -181,6 +184,61 @@ void BrowserWindow::migrateLegacyData()
     }
 }
 
+
+void BrowserWindow::initExtensionBackground()
+{
+    const QList<Extension> exts = ExtensionManager::loadAll();
+    QString code;
+    for (const Extension &ext : exts) {
+        for (const QString &rel : ext.backgroundScripts) {
+            QFile f(ext.dir + QLatin1Char('/') + rel);
+            if (f.open(QIODevice::ReadOnly))
+                code += QString::fromUtf8(f.readAll()) + QChar(10);
+        }
+    }
+    if (code.trimmed().isEmpty())
+        return;
+
+    m_bgPage = new BreezeWebPage(this);
+    // 提供与 content script 相同的 chrome.* 垫片
+    const QString shim = QStringLiteral(
+        "(function(){"
+        "window.chrome=window.chrome||{};"
+        "window.chrome.runtime=window.chrome.runtime||{};"
+        "window.chrome.runtime.id='breeze-ext';"
+        "window.chrome.runtime.getURL=function(p){return p;};"
+        "window.chrome.runtime.sendMessage=function(msg,cb){"
+        "try{console.log('__BREEZE_EXTMSG__:'+JSON.stringify(msg));}catch(e){}"
+        "if(typeof cb==='function')cb({ok:true});};"
+        "window.chrome.runtime.onMessage={addListener:function(){}};"
+        "window.chrome.runtime.lastError=undefined;"
+        "window.__breezeMsgListeners=window.__breezeMsgListeners||[];"
+        "window.__breezeOnMessage=function(json){"
+        "var msg;try{msg=JSON.parse(json);}catch(e){return;}"
+        "window.__breezeMsgListeners.forEach(function(fn){"
+        "try{fn(msg,{id:'breeze-ext'},function(){});}catch(e){}});};"
+        "})();");
+    m_bgPage->runJavaScript(shim + QChar(10) + code);
+
+    // background 发出的消息同样广播给所有标签
+    connect(qobject_cast<BreezeWebPage *>(m_bgPage), &BreezeWebPage::extMessage,
+            this, [this](const QString &json) {
+        if (!m_tabs)
+            return;
+        const QString arr = QString::fromUtf8(
+            QJsonDocument(QJsonArray{ json }).toJson(QJsonDocument::Compact));
+        const QString jsonLiteral = arr.mid(1, arr.length() - 2);
+        const QString js = QStringLiteral(
+            "(function(){if(window.__breezeOnMessage)"
+            "window.__breezeOnMessage(%1);})();").arg(jsonLiteral);
+        for (int i = 0; i < m_tabs->count(); ++i) {
+            if (auto *v = qobject_cast<WebView *>(m_tabs->widget(i)))
+                v->page()->runJavaScript(js);
+        }
+        if (m_bgPage)
+            m_bgPage->runJavaScript(js);
+    });
+}
 
 void BrowserWindow::notifyPreviousCrash()
 {

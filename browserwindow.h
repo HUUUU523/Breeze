@@ -122,6 +122,9 @@ public:
     // 上次异常退出时由 main 调用，弹提示并提供恢复会话
     void notifyPreviousCrash();
 
+    // 初始化扩展 background 页（隐藏页，注入 background 脚本）
+    void initExtensionBackground();
+
 protected:
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -321,6 +324,7 @@ private:
     QHash<WebView *, QTimer *> m_refreshTimers;   // 标签 -> 定时刷新定时器
     class QTimer *m_sleepTimer = nullptr;         // 标签休眠检查定时器
     QWidget *m_dragHighlight = nullptr;           // 书签拖拽时高亮的目标
+    class BreezeWebPage *m_bgPage = nullptr;      // 扩展 background 隐藏页
     QUrl                m_homeUrl{"https://www.bing.com"};
 
     // ---- 子系统 ----
