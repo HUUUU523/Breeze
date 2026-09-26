@@ -230,9 +230,37 @@ bool BrowserWindow::eventFilter(QObject *obj, QEvent *event)
     if (obj == m_bookmarkBar && event->type() == QEvent::DragMove) {
         auto *de = static_cast<QDragMoveEvent *>(event);
         if (de->mimeData()->hasFormat(QStringLiteral("application/x-breeze-bookmark"))) {
+            // 高亮当前悬停的分组/书签按钮
+            QWidget *hover = m_bookmarkBar->childAt(de->position().toPoint());
+            QWidget *target = nullptr;
+            for (QWidget *w = hover; w; w = w->parentWidget()) {
+                if (w->property("breezeGroupName").isValid()
+                    || qobject_cast<BookmarkButton *>(w)) {
+                    target = w;
+                    break;
+                }
+            }
+            if (target != m_dragHighlight) {
+                if (auto *old = qobject_cast<QToolButton *>(m_dragHighlight))
+                    old->setStyleSheet(QString());
+                m_dragHighlight = target;
+                if (auto *btn = qobject_cast<QToolButton *>(target))
+                    btn->setStyleSheet(QStringLiteral(
+                        "QToolButton{background:#4a6fa5;color:white;border-radius:3px;}"));
+            }
             de->acceptProposedAction();
             return true;
         }
+    }
+    if (obj == m_bookmarkBar && (event->type() == QEvent::DragLeave
+                                 || event->type() == QEvent::Drop)) {
+        // 清除高亮
+        if (auto *old = qobject_cast<QToolButton *>(m_dragHighlight))
+            old->setStyleSheet(QString());
+        m_dragHighlight = nullptr;
+        // Drop 继续走下面的分支处理
+        if (event->type() == QEvent::DragLeave)
+            return true;
     }
     if (obj == m_bookmarkBar && event->type() == QEvent::Drop) {
         auto *de = static_cast<QDropEvent *>(event);

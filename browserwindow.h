@@ -13,6 +13,8 @@
 #include <QApplication>
 #include <QDrag>
 #include <QMimeData>
+#include <QPainter>
+#include <QPixmap>
 
 #include "historymanager.h"
 
@@ -77,12 +79,24 @@ protected:
             QToolButton::mouseMoveEvent(e);
             return;
         }
-        // 启动拖拽：携带书签 URL
+        // 启动拖拽：携带书签 URL + 半透明缩略图
         auto *drag = new QDrag(this);
         auto *mime = new QMimeData;
         mime->setData(QStringLiteral("application/x-breeze-bookmark"),
                       m_url.toString().toUtf8());
         drag->setMimeData(mime);
+        QPixmap pm(size());
+        pm.fill(Qt::transparent);
+        render(&pm);
+        QPixmap ghost(pm.size());
+        ghost.fill(Qt::transparent);
+        {
+            QPainter p(&ghost);
+            p.setOpacity(0.6);
+            p.drawPixmap(0, 0, pm);
+        }
+        drag->setPixmap(ghost);
+        drag->setHotSpot(e->pos());
         drag->exec(Qt::MoveAction);
     }
 private:
@@ -306,6 +320,7 @@ private:
     QSet<QObject *>     m_pinnedTabs;   // 已固定的标签（存 view 指针）
     QHash<WebView *, QTimer *> m_refreshTimers;   // 标签 -> 定时刷新定时器
     class QTimer *m_sleepTimer = nullptr;         // 标签休眠检查定时器
+    QWidget *m_dragHighlight = nullptr;           // 书签拖拽时高亮的目标
     QUrl                m_homeUrl{"https://www.bing.com"};
 
     // ---- 子系统 ----
