@@ -158,7 +158,7 @@ DownloadManager::DownloadManager(QWidget *parent)
             this, QStringLiteral("保存到"), dir);
         if (save.isEmpty())
             return;
-        startResumableDownload(QUrl(url.trimmed()), save);
+        enqueueDownload(QUrl(url.trimmed()), save);
     });
     layout->addWidget(newBtn);
 
@@ -168,6 +168,21 @@ DownloadManager::DownloadManager(QWidget *parent)
 int DownloadManager::rowForDownload(QWebEngineDownloadRequest *download) const
 {
     return m_rows.value(download, -1);
+}
+
+void DownloadManager::enqueueDownload(const QUrl &url, const QString &savePath)
+{
+    m_queue.append({url, savePath});
+    scheduleNext();
+}
+
+void DownloadManager::scheduleNext()
+{
+    while (m_activeCount < m_maxConcurrent && !m_queue.isEmpty()) {
+        const PendingJob job = m_queue.takeFirst();
+        ++m_activeCount;
+        startResumableDownload(job.url, job.savePath);
+    }
 }
 
 void DownloadManager::startResumableDownload(const QUrl &url, const QString &savePath)
@@ -289,6 +304,11 @@ void DownloadManager::startResumableDownload(const QUrl &url, const QString &sav
 
                 if (!ok)
                     qWarning("下载中断：%s", qPrintable(name));
+
+                // 一个任务结束，调度队列中的下一个
+                if (m_activeCount > 0)
+                    --m_activeCount;
+                scheduleNext();
             });
 }
 
@@ -332,6 +352,11 @@ void DownloadManager::startSegmentedDownload(const QUrl &url, const QString &sav
                 if (!ok && !err.isEmpty())
                     qWarning("分片下载失败：%s", qPrintable(err));
                 seg->deleteLater();
+
+                // 一个任务结束，调度队列中的下一个
+                if (m_activeCount > 0)
+                    --m_activeCount;
+                scheduleNext();
             });
     seg->start();
 }
@@ -523,7 +548,7 @@ void DownloadManager::addDownload(QWebEngineDownloadRequest *download)
         const QString name = download->downloadFileName();
         if (!u.isValid() || dir.isEmpty() || name.isEmpty())
             return;
-        startResumableDownload(u, dir + QLatin1Char('/') + name);
+        enqueueDownload(u, dir + QLatin1Char('/') + name);
     });
     m_table->setCellWidget(row, 3, btnWidget);
 

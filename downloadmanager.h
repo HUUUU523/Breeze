@@ -58,6 +58,14 @@ private:
     QList<DownloadRecord> m_records;
     QNetworkAccessManager *m_net = nullptr;
     QHash<QString, int> m_retryCount;   // savePath -> 已重试次数
+
+    // 下载队列（最多 m_maxConcurrent 个并发，其余排队）
+    struct PendingJob { QUrl url; QString savePath; };
+    QList<PendingJob> m_queue;
+    int m_activeCount = 0;
+    int m_maxConcurrent = 3;
+    void enqueueDownload(const QUrl &url, const QString &savePath);
+    void scheduleNext();
 };
 
 #endif // DOWNLOADMANAGER_H
