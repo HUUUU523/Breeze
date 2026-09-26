@@ -14,6 +14,7 @@
 #include "syncmerge.h"
 #include "syncdialog.h"
 #include "toolbox.h"
+#include "taskmanagerdialog.h"
 #include "translator.h"
 #include "updatemanager.h"
 #include "userscriptmanager.h"
@@ -468,6 +469,7 @@ void BrowserWindow::setupActions()
     QAction *actUs = mainMenu->addAction(QStringLiteral("用户脚本…"));
     QAction *actExt = mainMenu->addAction(QStringLiteral("扩展管理…"));
     QAction *actToolbox = mainMenu->addAction(QStringLiteral("工具箱…"));
+    QAction *actTaskMgr = mainMenu->addAction(QStringLiteral("任务管理器…"));
     QAction *actSync = mainMenu->addAction(QStringLiteral("云同步…"));
     mainMenu->addSeparator();
 
@@ -534,6 +536,16 @@ void BrowserWindow::setupActions()
         dlg.exec();
     });
     connect(actToolbox, &QAction::triggered, this, &BrowserWindow::showToolbox);
+    connect(actTaskMgr, &QAction::triggered, this, [this]() {
+        TaskManagerDialog dlg(this);
+        QList<WebView *> tabs;
+        for (int i = 0; i < m_tabs->count(); ++i) {
+            if (auto *v = qobject_cast<WebView *>(m_tabs->widget(i)))
+                tabs.append(v);
+        }
+        dlg.setTabs(tabs);
+        dlg.exec();
+    });
     connect(actSync, &QAction::triggered, this, &BrowserWindow::showSyncDialog);
     connect(actCheckUpdate, &QAction::triggered, this, &BrowserWindow::checkForUpdates);
     connect(actClearData, &QAction::triggered, this, &BrowserWindow::clearBrowsingData);
