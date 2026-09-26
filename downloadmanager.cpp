@@ -23,6 +23,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
+#include <QMenu>
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
@@ -82,6 +83,40 @@ DownloadManager::DownloadManager(QWidget *parent)
                 if (!QFile::exists(path))
                     return;
                 QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+            });
+
+    // 右键菜单：优先下载 / 复制地址
+    m_table->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_table, &QTableWidget::customContextMenuRequested, this,
+            [this](const QPoint &pos) {
+                auto *item = m_table->itemAt(pos);
+                if (!item)
+                    return;
+                const int row = item->row();
+                QMenu menu(this);
+                QAction *prio = menu.addAction(QStringLiteral("优先下载（置顶队列）"));
+                QAction *copyPath = menu.addAction(QStringLiteral("复制保存路径"));
+                QAction *chosen = menu.exec(m_table->viewport()->mapToGlobal(pos));
+                if (chosen == copyPath) {
+                    if (auto *p = m_table->item(row, 3))
+                        QApplication::clipboard()->setText(p->text());
+                    return;
+                }
+                if (chosen == prio) {
+                    // 找到该行对应的待下载任务，移到队列最前
+                    auto *pathItem = m_table->item(row, 3);
+                    if (!pathItem)
+                        return;
+                    const QString savePath = pathItem->text();
+                    for (int i = 0; i < m_queue.size(); ++i) {
+                        if (m_queue.at(i).savePath == savePath) {
+                            const PendingJob job = m_queue.takeAt(i);
+                            m_queue.prepend(job);
+                            break;
+                        }
+                    }
+                    scheduleNext();
+                }
             });
 
     layout->addWidget(m_table);
