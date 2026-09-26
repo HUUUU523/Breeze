@@ -23,6 +23,8 @@ signals:
     void hoverUrlChanged(const QString &url);
     // 划词工具栏动作：action = explain/translate/search，text 为选中文字
     void selectionActionRequested(const QString &action, const QString &text);
+    // 扩展消息总线：页面通过 chrome.runtime.sendMessage 发出的消息
+    void extMessage(const QString &json);
 
 protected:
     void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level,
@@ -73,6 +75,9 @@ signals:
 
     // 请求在新标签打开某 URL
     void newTabRequested(const QUrl &url, bool switchToTab);
+
+    // 扩展消息总线：页面通过 chrome.runtime.sendMessage 发出的消息
+    void extMessage(const QString &json);
 
 
 protected:

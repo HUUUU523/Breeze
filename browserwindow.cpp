@@ -1756,6 +1756,23 @@ WebView *BrowserWindow::createTabView(bool privateMode)
             statusBar()->showMessage(u);
     });
 
+    // 扩展消息总线：把某标签页发出的消息广播给所有标签页
+    connect(view, &WebView::extMessage, this, [this](const QString &json) {
+        if (!m_tabs)
+            return;
+        // 用 JSON 字符串安全转义
+        const QString arr = QString::fromUtf8(
+            QJsonDocument(QJsonArray{ json }).toJson(QJsonDocument::Compact));
+        const QString jsonLiteral = arr.mid(1, arr.length() - 2);   // 去掉 [ 和 ]
+        const QString js = QStringLiteral(
+            "(function(){if(window.__breezeOnMessage)"
+            "window.__breezeOnMessage(%1);})();").arg(jsonLiteral);
+        for (int i = 0; i < m_tabs->count(); ++i) {
+            if (auto *v = qobject_cast<WebView *>(m_tabs->widget(i)))
+                v->page()->runJavaScript(js);
+        }
+    });
+
     const int index = m_tabs->addTab(view,
         privateMode ? QStringLiteral("隐私") : QStringLiteral("新标签页"));
     m_tabs->setCurrentIndex(index);
@@ -2685,22 +2702,31 @@ void BrowserWindow::injectExtensionScripts(WebView *view, const QUrl &url)
                 "remove:function(keys,cb){var arr=Array.isArray(keys)?keys:[keys];"
                 "arr.forEach(function(k){localStorage.removeItem('__breeze_ext_'+k);});"
                 "if(cb)cb();}};"
-                // chrome.runtime 最小子集
+                // chrome.runtime 最小子集（含消息总线）
                 "window.chrome.runtime=window.chrome.runtime||{};"
                 "window.chrome.runtime.id='breeze-ext';"
                 "window.chrome.runtime.getURL=function(p){return p;};"
-                "window.chrome.runtime.sendMessage=function(){"
-                "console.log('[Breeze] chrome.runtime.sendMessage:',arguments);};"
-                "window.chrome.runtime.onMessage={addListener:function(){}};"
+                "window.__breezeMsgListeners=window.__breezeMsgListeners||[];"
+                "window.chrome.runtime.sendMessage=function(msg,cb){"
+                "try{console.log('__BREEZE_EXTMSG__:'+JSON.stringify(msg));}catch(e){}"
+                "if(typeof cb==='function')cb({ok:true});};"
+                "window.chrome.runtime.onMessage={"
+                "addListener:function(fn){window.__breezeMsgListeners.push(fn);}};"
                 "window.chrome.runtime.lastError=undefined;"
+                // 由 C++ 调用，把消息分发给本页监听者
+                "window.__breezeOnMessage=function(json){"
+                "var msg;try{msg=JSON.parse(json);}catch(e){return;}"
+                "window.__breezeMsgListeners.forEach(function(fn){"
+                "try{fn(msg,{id:'breeze-ext'},function(){});}catch(e){}});};"
                 // chrome.tabs 最小子集
                 "window.chrome.tabs=window.chrome.tabs||{};"
                 "window.chrome.tabs.query=function(q,cb){if(cb)cb([{"
                 "url:location.href,title:document.title,active:true}]);};"
                 "window.chrome.tabs.create=function(o,cb){"
                 "if(o&&o.url)window.open(o.url,'_blank');if(cb)cb({});};"
-                "window.chrome.tabs.sendMessage=function(){"
-                "console.log('[Breeze] chrome.tabs.sendMessage:',arguments);};"
+                "window.chrome.tabs.sendMessage=function(id,msg,cb){"
+                "try{console.log('__BREEZE_EXTMSG__:'+JSON.stringify(msg));}catch(e){}"
+                "if(typeof cb==='function')cb({ok:true});};"
                 "})();");
 
             QWebEngineScript qs;
