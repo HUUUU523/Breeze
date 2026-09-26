@@ -207,6 +207,17 @@ int DownloadManager::rowForDownload(QWebEngineDownloadRequest *download) const
 
 void DownloadManager::enqueueDownload(const QUrl &url, const QString &savePath)
 {
+    // 先在表格里占一行"排队中"，让用户看到队列
+    const int row = m_table->rowCount();
+    m_table->insertRow(row);
+    m_table->setItem(row, 0, new QTableWidgetItem(QFileInfo(savePath).fileName()));
+    auto *bar = new QProgressBar(m_table);
+    bar->setRange(0, 100);
+    bar->setValue(0);
+    m_table->setCellWidget(row, 1, bar);
+    m_table->setItem(row, 2, new QTableWidgetItem(QStringLiteral("排队中")));
+    m_table->setItem(row, 3, new QTableWidgetItem(savePath));
+
     m_queue.append({url, savePath});
     scheduleNext();
 }
@@ -216,6 +227,16 @@ void DownloadManager::scheduleNext()
     while (m_activeCount < m_maxConcurrent && !m_queue.isEmpty()) {
         const PendingJob job = m_queue.takeFirst();
         ++m_activeCount;
+        // 移除对应的"排队中"行（按保存路径匹配，取最后一条）
+        for (int r = m_table->rowCount() - 1; r >= 0; --r) {
+            auto *p = m_table->item(r, 3);
+            auto *s = m_table->item(r, 2);
+            if (p && s && s->text() == QStringLiteral("排队中")
+                && p->text() == job.savePath) {
+                m_table->removeRow(r);
+                break;
+            }
+        }
         startResumableDownload(job.url, job.savePath);
     }
 }
