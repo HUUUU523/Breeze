@@ -1,0 +1,2 @@
+[1/2] Building CXX object CMakeFiles\Breeze.dir\browserwindow.cpp.obj
+[2/2] Linking CXX executable Breeze.exe

@@ -2513,7 +2513,46 @@ void BrowserWindow::injectUserScripts(WebView *view)
             view->page()->runJavaScript(js);
         } else {
             const QString shim = gmShim(s);
-            view->page()->runJavaScript(shim + s.code);
+            // @require：先拼接已缓存的外部依赖，再注入脚本
+            QString prefix;
+            bool needFetch = false;
+            for (const QString &reqUrl : s.requires) {
+                if (m_requireCache.contains(reqUrl))
+                    prefix += m_requireCache.value(reqUrl) + QLatin1Char(';');
+                else
+                    needFetch = true;
+            }
+            if (!needFetch) {
+                view->page()->runJavaScript(shim + prefix + s.code);
+            } else {
+                // 抓取缺失的依赖，完成后注入
+                auto *nam = new QNetworkAccessManager(this);
+                auto *pending = new int(0);
+                for (const QString &reqUrl : s.requires) {
+                    if (m_requireCache.contains(reqUrl))
+                        continue;
+                    ++(*pending);
+                    QNetworkRequest req{QUrl(reqUrl)};
+                    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Breeze"));
+                    QNetworkReply *reply = nam->get(req);
+                    connect(reply, &QNetworkReply::finished, this,
+                            [this, reply, reqUrl, nam, pending, view, shim, s]() {
+                        reply->deleteLater();
+                        if (reply->error() == QNetworkReply::NoError)
+                            m_requireCache.insert(reqUrl,
+                                QString::fromUtf8(reply->readAll()));
+                        if (--(*pending) == 0) {
+                            QString pre;
+                            for (const QString &u : s.requires)
+                                pre += m_requireCache.value(u) + QLatin1Char(';');
+                            if (view)
+                                view->page()->runJavaScript(shim + pre + s.code);
+                            nam->deleteLater();
+                            delete pending;
+                        }
+                    });
+                }
+            }
         }
     }
 }

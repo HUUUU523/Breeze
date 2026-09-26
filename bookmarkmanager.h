@@ -7,6 +7,7 @@
 class QTreeWidget;
 class QTreeWidgetItem;
 class QLineEdit;
+class QLabel;
 struct Bookmark;
 
 // 书签管理对话框：树形显示分组/书签，支持拖拽移动、增删改

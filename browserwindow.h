@@ -266,6 +266,7 @@ private:
     // ---- 数据 ----
     QList<Bookmark>     m_bookmarks;
     QHash<QString, QIcon> m_faviconCache;   // url -> favicon
+    QHash<QString, QString> m_requireCache; // @require URL -> 脚本内容
     class AiSidebar *m_aiSidebar = nullptr;
     class BookmarkSidebar *m_bookmarkSidebar = nullptr;
     QList<HistoryEntry> m_history;
