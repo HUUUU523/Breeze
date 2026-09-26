@@ -1,5 +1,6 @@
 #include "logger.h"
 
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -71,6 +72,32 @@ QString logFilePath()
     if (g_logPath.isEmpty())
         g_logPath = resolveLogPath();
     return g_logPath;
+}
+
+namespace {
+QString runningFlagPath()
+{
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(dir);
+    return dir + QStringLiteral("/running.flag");
+}
+} // namespace
+
+bool checkAndMarkRunning()
+{
+    const QString flag = runningFlagPath();
+    const bool crashed = QFile::exists(flag);
+    QFile f(flag);
+    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        f.write(QString::number(QCoreApplication::applicationPid()).toUtf8());
+        f.close();
+    }
+    return crashed;
+}
+
+void clearRunningFlag()
+{
+    QFile::remove(runningFlagPath());
 }
 
 } // namespace Logger

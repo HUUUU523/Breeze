@@ -8,6 +8,7 @@
 #include "downloadmanager.h"
 #include "extension.h"
 #include "extensiondialog.h"
+#include "logger.h"
 #include "historymanager.h"
 #include "settingsdialog.h"
 #include "syncmerge.h"
@@ -180,11 +181,28 @@ void BrowserWindow::migrateLegacyData()
 }
 
 
+void BreezePlaceholderDummy() {}
+
+
+void BrowserWindow::notifyPreviousCrash()
+{
+    // 延迟到事件循环启动后再弹，确保窗口已显示
+    QTimer::singleShot(800, this, [this]() {
+        const auto btn = QMessageBox::question(
+            this, QStringLiteral("Breeze"),
+            QStringLiteral("检测到上次未正常退出。是否打开新的标签页开始？"),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+        if (btn == QMessageBox::Yes)
+            onNewTab();
+    });
+}
+
 void BrowserWindow::closeEvent(QCloseEvent *event)
 {
     saveBookmarks();
     saveHistory();
     saveSession();
+    Logger::clearRunningFlag();
     QMainWindow::closeEvent(event);
 }
 

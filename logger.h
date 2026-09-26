@@ -13,6 +13,12 @@ void install();
 // 当前日志文件完整路径
 QString logFilePath();
 
+// ---- 崩溃恢复标志 ----
+// 启动时调用：写入运行标志；若上次标志仍存在（异常退出）则返回 true
+bool checkAndMarkRunning();
+// 正常退出时调用：清除运行标志
+void clearRunningFlag();
+
 } // namespace Logger
 
 #endif // LOGGER_H

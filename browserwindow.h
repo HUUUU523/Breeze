@@ -105,6 +105,9 @@ public:
     // 合并两份同步数据（书签/历史取并集，返回合并结果）
     static QByteArray mergeSyncData(const QByteArray &local, const QByteArray &remote);
 
+    // 上次异常退出时由 main 调用，弹提示并提供恢复会话
+    void notifyPreviousCrash();
+
 protected:
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *obj, QEvent *event) override;

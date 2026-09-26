@@ -33,6 +33,8 @@ int main(int argc, char *argv[])
 
     // 安装文件日志（AppData/logs/breeze.log）
     Logger::install();
+    // 崩溃检测：上次异常退出则记下，供主窗口提示恢复
+    const bool lastCrashed = Logger::checkAndMarkRunning();
 
     // 应用全局代理（来自设置）
     SettingsDialog::applyProxy();
@@ -49,7 +51,11 @@ int main(int argc, char *argv[])
     profile->setHttpCacheType(QWebEngineProfile::DiskHttpCache);
 
     BrowserWindow window;
+    if (lastCrashed)
+        window.notifyPreviousCrash();
     window.show();
 
-    return app.exec();
+    const int ret = app.exec();
+    Logger::clearRunningFlag();
+    return ret;
 }
