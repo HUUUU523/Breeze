@@ -34,6 +34,9 @@
 #include <QStringListModel>
 #include <QDate>
 #include <QDateTime>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QActionGroup>
 #include <QDesktopServices>
 #include <QDir>
@@ -157,6 +160,61 @@ bool BrowserWindow::eventFilter(QObject *obj, QEvent *event)
             const int idx = m_tabs->tabBar()->tabAt(me->position().toPoint());
             if (idx >= 0)
                 onCloseTab(idx);
+            return true;
+        }
+    }
+    // 书签栏拖拽排序
+    if (obj == m_bookmarkBar && event->type() == QEvent::DragEnter) {
+        auto *de = static_cast<QDragEnterEvent *>(event);
+        if (de->mimeData()->hasFormat(QStringLiteral("application/x-breeze-bookmark"))) {
+            de->acceptProposedAction();
+            return true;
+        }
+    }
+    if (obj == m_bookmarkBar && event->type() == QEvent::DragMove) {
+        auto *de = static_cast<QDragMoveEvent *>(event);
+        if (de->mimeData()->hasFormat(QStringLiteral("application/x-breeze-bookmark"))) {
+            de->acceptProposedAction();
+            return true;
+        }
+    }
+    if (obj == m_bookmarkBar && event->type() == QEvent::Drop) {
+        auto *de = static_cast<QDropEvent *>(event);
+        if (de->mimeData()->hasFormat(QStringLiteral("application/x-breeze-bookmark"))) {
+            const QString srcUrl = QString::fromUtf8(
+                de->mimeData()->data(QStringLiteral("application/x-breeze-bookmark")));
+            // 找到 drop 位置的按钮，确定目标书签
+            const QPoint pos = de->position().toPoint();
+            QWidget *target = m_bookmarkBar->childAt(pos);
+            while (target && !qobject_cast<BookmarkButton *>(target))
+                target = target->parentWidget();
+            const QUrl dstUrl = target
+                ? qobject_cast<BookmarkButton *>(target)->url()
+                : QUrl();
+
+            const int from = [&]() {
+                for (int i = 0; i < m_bookmarks.size(); ++i)
+                    if (m_bookmarks.at(i).url.toString() == srcUrl)
+                        return i;
+                return -1;
+            }();
+            int to = -1;
+            if (dstUrl.isValid()) {
+                for (int i = 0; i < m_bookmarks.size(); ++i) {
+                    if (m_bookmarks.at(i).url == dstUrl) {
+                        to = i;
+                        break;
+                    }
+                }
+            } else {
+                to = m_bookmarks.size() - 1;   // 拖到空白处 → 移到末尾
+            }
+            if (from >= 0 && to >= 0 && from != to) {
+                m_bookmarks.move(from, to);
+                saveBookmarks();
+                rebuildBookmarkBar();
+            }
+            de->acceptProposedAction();
             return true;
         }
     }
@@ -584,6 +642,8 @@ void BrowserWindow::setupBookmarks()
     m_bookmarkBar = new QToolBar(QStringLiteral("Bookmarks"), this);
     m_bookmarkBar->setMovable(false);
     m_bookmarkBar->setIconSize(QSize(16, 16));
+    m_bookmarkBar->setAcceptDrops(true);
+    m_bookmarkBar->installEventFilter(this);
     addToolBarBreak();
     addToolBar(m_bookmarkBar);
 

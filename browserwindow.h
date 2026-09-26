@@ -7,7 +7,12 @@
 #include <QMouseEvent>
 #include <QList>
 #include <QMainWindow>
+#include <QPoint>
 #include <QUrl>
+
+#include <QApplication>
+#include <QDrag>
+#include <QMimeData>
 
 #include "historymanager.h"
 
@@ -57,8 +62,32 @@ protected:
         }
         QToolButton::mouseReleaseEvent(e);
     }
+    void mousePressEvent(QMouseEvent *e) override {
+        if (e->button() == Qt::LeftButton)
+            m_dragStart = e->pos();
+        QToolButton::mousePressEvent(e);
+    }
+    void mouseMoveEvent(QMouseEvent *e) override {
+        if (!(e->buttons() & Qt::LeftButton)) {
+            QToolButton::mouseMoveEvent(e);
+            return;
+        }
+        if ((e->pos() - m_dragStart).manhattanLength()
+            < QApplication::startDragDistance()) {
+            QToolButton::mouseMoveEvent(e);
+            return;
+        }
+        // 启动拖拽：携带书签 URL
+        auto *drag = new QDrag(this);
+        auto *mime = new QMimeData;
+        mime->setData(QStringLiteral("application/x-breeze-bookmark"),
+                      m_url.toString().toUtf8());
+        drag->setMimeData(mime);
+        drag->exec(Qt::MoveAction);
+    }
 private:
     QUrl m_url;
+    QPoint m_dragStart;
 };
 
 class BrowserWindow : public QMainWindow
