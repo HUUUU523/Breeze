@@ -638,11 +638,21 @@ void BrowserWindow::rebuildBookmarkBar()
         return;
     m_bookmarkBar->clear();
 
-    // 未分组的书签：直接作为按钮
+    // 收集未分组书签
+    QList<Bookmark> ungrouped;
     for (const Bookmark &b : m_bookmarks) {
-        if (!b.group.isEmpty())
-            continue;
+        if (b.group.isEmpty())
+            ungrouped.append(b);
+    }
+
+    // 未分组书签：前 kMaxVisible 个直接显示，其余进溢出菜单
+    constexpr int kMaxVisible = 15;
+    int shown = 0;
+    for (const Bookmark &b : ungrouped) {
+        if (shown >= kMaxVisible)
+            break;
         addBookmarkAction(b, m_bookmarkBar);
+        ++shown;
     }
 
     // 分组书签：每组一个带下拉菜单的按钮
@@ -681,6 +691,39 @@ void BrowserWindow::rebuildBookmarkBar()
         btn->setMenu(menu);
         btn->setPopupMode(QToolButton::InstantPopup);
         m_bookmarkBar->addWidget(btn);
+    }
+
+    // 溢出菜单：未分组书签的前 kMaxVisible 个之后的项
+    if (ungrouped.size() > kMaxVisible) {
+        auto *moreBtn = new QToolButton(m_bookmarkBar);
+        moreBtn->setText(QStringLiteral("»"));
+        moreBtn->setToolTip(QStringLiteral("更多书签"));
+        moreBtn->setPopupMode(QToolButton::InstantPopup);
+        auto *moreMenu = new QMenu(moreBtn);
+        for (int i = kMaxVisible; i < ungrouped.size(); ++i) {
+            const Bookmark &b = ungrouped.at(i);
+            const QString text = b.title.isEmpty() ? b.url.host() : b.title;
+            QAction *a = moreMenu->addAction(text);
+            a->setToolTip(b.url.toString());
+            const QUrl url = b.url;
+            const QString urlKey = url.toString();
+            if (m_faviconCache.contains(urlKey)) {
+                const QIcon ico = m_faviconCache.value(urlKey);
+                if (!ico.isNull())
+                    a->setIcon(ico);
+            } else {
+                QWebEngineProfile::defaultProfile()->requestIconForPageURL(
+                    url, 16, [this, a, urlKey](const QIcon &icon, const QUrl &, const QUrl &) {
+                        if (!icon.isNull()) {
+                            m_faviconCache.insert(urlKey, icon);
+                            a->setIcon(icon);
+                        }
+                    });
+            }
+            connect(a, &QAction::triggered, this, [this, url]{ openBookmark(url); });
+        }
+        moreBtn->setMenu(moreMenu);
+        m_bookmarkBar->addWidget(moreBtn);
     }
 
     // 右侧固定"添加当前页"按钮
