@@ -2492,19 +2492,36 @@ static QString gmShim(const UserScript &s)
     if (s.grants.isEmpty())
         return QString();
     bool needStorage = false;
+    bool needXhr = false;
     for (const QString &g : s.grants) {
         if (g.startsWith(QStringLiteral("GM_")) && g.contains(QStringLiteral("Value")))
             needStorage = true;
+        if (g == QStringLiteral("GM_xmlhttpRequest")
+            || g == QStringLiteral("GM.xmlHttpRequest"))
+            needXhr = true;
     }
-    if (!needStorage)
+    if (!needStorage && !needXhr)
         return QString();
-    return QStringLiteral(
-        "(function(){"
-        "window.GM_setValue=function(k,v){try{localStorage.setItem('__breeze_gm_'+k,JSON.stringify(v));}catch(e){}};"
-        "window.GM_getValue=function(k,d){try{var v=localStorage.getItem('__breeze_gm_'+k);"
-        "return v===null?d:JSON.parse(v);}catch(e){return d;}};"
-        "window.GM_deleteValue=function(k){try{localStorage.removeItem('__breeze_gm_'+k);}catch(e){}};"
-        "})();");
+
+    QString shim = QStringLiteral("(function(){");
+    if (needStorage) {
+        shim += QStringLiteral(
+            "window.GM_setValue=function(k,v){try{localStorage.setItem('__breeze_gm_'+k,JSON.stringify(v));}catch(e){}};"
+            "window.GM_getValue=function(k,d){try{var v=localStorage.getItem('__breeze_gm_'+k);"
+            "return v===null?d:JSON.parse(v);}catch(e){return d;}};"
+            "window.GM_deleteValue=function(k){try{localStorage.removeItem('__breeze_gm_'+k);}catch(e){}};");
+    }
+    if (needXhr) {
+        // 基于 fetch 的简化实现（受页面同源策略约束）
+        shim += QStringLiteral(
+            "window.GM_xmlhttpRequest=function(o){o=o||{};var h=o.headers||{};"
+            "fetch(o.url,{method:o.method||'GET',headers:h,body:o.data}).then(function(r){"
+            "return r.text().then(function(t){var resp={status:r.status,statusText:r.statusText,"
+            "responseText:t,responseHeaders:''};if(o.onload)o.onload(resp);});"
+            "}).catch(function(e){if(o.onerror)o.onerror(e);});};");
+    }
+    shim += QStringLiteral("})();");
+    return shim;
 }
 }
 
@@ -2573,9 +2590,36 @@ void BrowserWindow::injectExtensionScripts(WebView *view, const QUrl &url)
             if (code.trimmed().isEmpty())
                 continue;
 
+            // chrome.storage 最小 shim（基于 localStorage）
+            const QString extShim = QStringLiteral(
+                "(function(){"
+                "if(window.chrome&&window.chrome.storage)return;"
+                "window.chrome=window.chrome||{};"
+                "window.chrome.storage=window.chrome.storage||{};"
+                "window.chrome.storage.local={"
+                "get:function(keys,cb){var out={};"
+                "if(keys===null||keys===undefined){for(var i=0;i<localStorage.length;i++){"
+                "var k=localStorage.key(i);if(k.indexOf('__breeze_ext_')===0)"
+                "out[k.slice(12)]=JSON.parse(localStorage.getItem(k));}}"
+                "else if(typeof keys==='string'){var v=localStorage.getItem('__breeze_ext_'+keys);"
+                "if(v!==null)out[keys]=JSON.parse(v);}"
+                "else if(Array.isArray(keys)){keys.forEach(function(k){"
+                "var v=localStorage.getItem('__breeze_ext_'+k);if(v!==null)out[k]=JSON.parse(v);});}"
+                "else{Object.keys(keys).forEach(function(k){"
+                "var v=localStorage.getItem('__breeze_ext_'+k);"
+                "out[k]=(v!==null)?JSON.parse(v):keys[k];});}"
+                "if(cb)cb(out);},"
+                "set:function(items,cb){Object.keys(items).forEach(function(k){"
+                "localStorage.setItem('__breeze_ext_'+k,JSON.stringify(items[k]));});"
+                "if(cb)cb();},"
+                "remove:function(keys,cb){var arr=Array.isArray(keys)?keys:[keys];"
+                "arr.forEach(function(k){localStorage.removeItem('__breeze_ext_'+k);});"
+                "if(cb)cb();}};"
+                "})();");
+
             QWebEngineScript qs;
             qs.setName(QStringLiteral("breeze-ext-%1").arg(ext.name));
-            qs.setSourceCode(code);
+            qs.setSourceCode(extShim + QChar(10) + code);
             if (cs.runAt == QStringLiteral("document_start"))
                 qs.setInjectionPoint(QWebEngineScript::DocumentCreation);
             else if (cs.runAt == QStringLiteral("document_end"))
