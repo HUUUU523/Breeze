@@ -302,6 +302,7 @@ private:
     QList<QUrl>         m_closedTabs;   // 最近关闭的标签（栈，上限 20）
     QSet<QObject *>     m_pinnedTabs;   // 已固定的标签（存 view 指针）
     QHash<WebView *, QTimer *> m_refreshTimers;   // 标签 -> 定时刷新定时器
+    class QTimer *m_sleepTimer = nullptr;         // 标签休眠检查定时器
     QUrl                m_homeUrl{"https://www.bing.com"};
 
     // ---- 子系统 ----

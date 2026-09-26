@@ -109,6 +109,46 @@ BrowserWindow::BrowserWindow(QWidget *parent)
     resize(1280, 800);
     setWindowTitle(QStringLiteral("Breeze ") + QStringLiteral(BREEZE_VERSION));
 
+    // 标签休眠检查：每 60 秒检查一次，超过 15 分钟未激活的标签自动休眠
+    m_sleepTimer = new QTimer(this);
+    m_sleepTimer->setInterval(60 * 1000);
+    connect(m_sleepTimer, &QTimer::timeout, this, [this]() {
+        if (!m_tabs)
+            return;
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        constexpr qint64 kIdleMs = 15 * 60 * 1000;   // 15 分钟
+        for (int i = 0; i < m_tabs->count(); ++i) {
+            auto *v = qobject_cast<WebView *>(m_tabs->widget(i));
+            if (!v || v == currentView())
+                continue;
+            if (v->property("breezePrivate").toBool())
+                continue;
+            if (m_pinnedTabs.contains(v))
+                continue;
+            if (v->page() && v->page()->isAudioMuted() == false
+                && v->page()->recentlyAudible())
+                continue;   // 正在播放音频，不休眠
+            const qint64 last = v->property("breezeLastActive").toLongLong();
+            if (last > 0 && now - last > kIdleMs
+                && !v->property("breezeSleeping").toBool()) {
+                // 进入休眠：记住 URL，加载空白占位页
+                v->setProperty("breezeSleepUrl", v->url().toString());
+                v->setProperty("breezeSleepTitle", v->title());
+                v->setProperty("breezeSleeping", true);
+                v->setHtml(QStringLiteral(
+                    "<html><body style='display:flex;align-items:center;"
+                    "justify-content:center;height:100vh;font-family:sans-serif;"
+                    "color:#888;background:#fafafa'>"
+                    "<div style='text-align:center'>"
+                    "<div style='font-size:48px'>💤</div>"
+                    "<div style='margin-top:12px'>标签已休眠（点击恢复）</div>"
+                    "</div></body></html>"));
+                updateTabTitle(v);
+            }
+        }
+    });
+    m_sleepTimer->start();
+
     applyTheme();
 }
 
@@ -1986,6 +2026,14 @@ void BrowserWindow::onTabChanged(int index)
         m_urlBar->clear();
         return;
     }
+    // 记录激活时间；若该标签处于休眠状态则恢复
+    view->setProperty("breezeLastActive", QDateTime::currentMSecsSinceEpoch());
+    if (view->property("breezeSleeping").toBool()) {
+        const QString u = view->property("breezeSleepUrl").toString();
+        view->setProperty("breezeSleeping", false);
+        if (!u.isEmpty())
+            view->setUrl(QUrl(u));
+    }
     m_urlBar->setText(view->url().toString());
     m_urlBar->setCursorPosition(0);
     setWindowTitle(view->title().isEmpty()
@@ -3264,6 +3312,8 @@ void BrowserWindow::updateTabTitle(WebView *view)
         title = title.left(24) + QStringLiteral("\u2026");
     if (m_pinnedTabs.contains(view))
         title = QStringLiteral("📌 ") + title;
+    if (view->property("breezeSleeping").toBool())
+        title = QStringLiteral("💤 ") + title;
     if (view->page() && view->page()->isAudioMuted())
         title = QStringLiteral("🔇 ") + title;
     m_tabs->setTabText(index, title);
