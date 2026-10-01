@@ -1,4 +1,5 @@
 #include "syncdialog.h"
+#include "accountmanager.h"
 #include "browserwindow.h"
 #include "syncmanager.h"
 
@@ -170,6 +171,19 @@ void SyncDialog::onQuickLogin()
                         + QStringLiteral("请检查账号/应用密码是否正确。"));
             });
     mgr->testConnection();
+}
+
+void SyncDialog::setAccount(AccountManager *account)
+{
+    m_account = account;
+    if (m_account && m_account->isLoggedIn()) {
+        // 按账号 email 的哈希生成隔离的云端文件名，避免多账号互相覆盖
+        const QString email = m_account->email();
+        const QByteArray hash = QCryptographicHash::hash(
+            email.toUtf8(), QCryptographicHash::Sha256).toHex().left(12);
+        m_pathEdit->setText(QStringLiteral("breeze-sync-%1.dat")
+                                .arg(QString::fromLatin1(hash)));
+    }
 }
 
 void SyncDialog::loadConfig()

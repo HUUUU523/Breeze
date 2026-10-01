@@ -2662,6 +2662,7 @@ bool BrowserWindow::importSyncData(const QByteArray &data)
 void BrowserWindow::showSyncDialog()
 {
     SyncDialog dlg(this);
+    dlg.setAccount(m_account);
     dlg.exec();
 }
 

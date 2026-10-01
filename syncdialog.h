@@ -7,6 +7,7 @@ class QLineEdit;
 class QComboBox;
 class QPushButton;
 class BrowserWindow;
+class AccountManager;
 
 // 云同步配置与操作对话框
 class SyncDialog : public QDialog
@@ -15,6 +16,9 @@ class SyncDialog : public QDialog
 
 public:
     explicit SyncDialog(BrowserWindow *browser);
+
+    // 设置账号管理器：登录后按账号隔离云端文件名
+    void setAccount(AccountManager *account);
 
 private slots:
     void onUpload();
@@ -27,6 +31,7 @@ private:
     void saveConfig();
 
     BrowserWindow *m_browser = nullptr;
+    AccountManager *m_account = nullptr;
 
     // 快速登录
     QComboBox   *m_providerCombo = nullptr;
