@@ -27,6 +27,8 @@ signals:
     void extMessage(const QString &json);
     // 扩展 tabs 命令（chrome.tabs.remove/reload 等）
     void tabsCommand(const QString &json);
+    // 元素选择器返回的矩形（JSON 字符串）
+    void elementRectSelected(const QString &json);
 
 protected:
     void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level,
@@ -86,6 +88,8 @@ signals:
     void gestureTriggered(const QString &gesture);
     // 手势进行中的实时轨迹（用于绘制提示）
     void gestureProgress(const QPoint &pos);
+    // 元素选择器返回的矩形（JSON 字符串）
+    void elementRectSelected(const QString &json);
 
 
 protected:

@@ -151,6 +151,10 @@ public:
     // ---- 媒体控制 ----
     void showMediaControl();
 
+    // ---- 元素截图 ----
+    void captureElement();   // 点击页面元素截图
+    void captureRect(const QRect &rect);   // 截取视口内的矩形区域
+
     // ---- 网页笔记 ----
     void showNoteForCurrentPage();
     void saveNotes() const;

@@ -587,6 +587,96 @@ void BrowserWindow::showNoteForCurrentPage()
     dlg.exec();
 }
 
+// ===================== 元素截图 =====================
+
+void BrowserWindow::captureRect(const QRect &rect)
+{
+    WebView *v = currentView();
+    if (!v || rect.isEmpty())
+        return;
+    const QPixmap shot = v->grab(rect);
+    if (shot.isNull()) {
+        QMessageBox::warning(this, QStringLiteral("截图失败"),
+                             QStringLiteral("无法捕获该区域。"));
+        return;
+    }
+    QMessageBox box(this);
+    box.setWindowTitle(QStringLiteral("元素截图"));
+    box.setText(QStringLiteral("截取成功（%1×%2），选择操作：")
+                    .arg(shot.width()).arg(shot.height()));
+    QPushButton *copyBtn = box.addButton(QStringLiteral("复制到剪贴板"), QMessageBox::AcceptRole);
+    QPushButton *saveBtn = box.addButton(QStringLiteral("保存为文件…"), QMessageBox::ActionRole);
+    box.addButton(QStringLiteral("取消"), QMessageBox::RejectRole);
+    box.exec();
+    if (box.clickedButton() == copyBtn) {
+        QApplication::clipboard()->setPixmap(shot);
+        statusBar()->showMessage(QStringLiteral("元素截图已复制"), 3000);
+        return;
+    }
+    if (box.clickedButton() != saveBtn)
+        return;
+    const QString path = QFileDialog::getSaveFileName(
+        this, QStringLiteral("保存元素截图"),
+        QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
+            + QStringLiteral("/breeze-element.png"),
+        QStringLiteral("PNG 图片 (*.png)"));
+    if (!path.isEmpty() && shot.save(path, "PNG"))
+        statusBar()->showMessage(QStringLiteral("已保存：%1").arg(path), 3000);
+}
+
+void BrowserWindow::captureElement()
+{
+    WebView *v = currentView();
+    if (!v)
+        return;
+    // 注入"元素选择器"JS：鼠标移动高亮，点击后返回 rect
+    v->page()->runJavaScript(QStringLiteral(
+        "(function(){"
+        "if(window.__breezePicker)return 'busy';"
+        "window.__breezePicker=true;"
+        "var overlay=document.createElement('div');"
+        "overlay.style.cssText='position:fixed;border:2px solid #3498db;"
+        "background:rgba(52,152,219,.15);pointer-events:none;z-index:2147483646;"
+        "transition:all .05s;';"
+        "document.body.appendChild(overlay);"
+        "var tip=document.createElement('div');"
+        "tip.textContent='点击选择元素（Esc 取消）';"
+        "tip.style.cssText='position:fixed;top:10px;left:50%;transform:translateX(-50%);"
+        "background:#333;color:#fff;padding:6px 16px;border-radius:6px;"
+        "z-index:2147483647;font:14px sans-serif;';"
+        "document.body.appendChild(tip);"
+        "function mv(e){"
+        "var el=document.elementFromPoint(e.clientX,e.clientY);"
+        "if(!el||el===overlay||el===tip)return;"
+        "var r=el.getBoundingClientRect();"
+        "overlay.style.left=r.left+'px';overlay.style.top=r.top+'px';"
+        "overlay.style.width=r.width+'px';overlay.style.height=r.height+'px';"
+        "}"
+        "function click(e){"
+        "e.preventDefault();e.stopPropagation();"
+        "var el=document.elementFromPoint(e.clientX,e.clientY);"
+        "if(!el){cleanup();return;}"
+        "var r=el.getBoundingClientRect();"
+        "console.log('__BREEZE_ELEM__:'+JSON.stringify("
+        "{x:Math.round(r.left),y:Math.round(r.top),w:Math.round(r.width),h:Math.round(r.height)}));"
+        "cleanup();}"
+        "function key(e){if(e.key==='Escape')cleanup();}"
+        "function cleanup(){"
+        "window.__breezePicker=false;"
+        "overlay.remove();tip.remove();"
+        "document.removeEventListener('mousemove',mv,true);"
+        "document.removeEventListener('click',click,true);"
+        "document.removeEventListener('keydown',key,true);}"
+        "document.addEventListener('mousemove',mv,true);"
+        "document.addEventListener('click',click,true);"
+        "document.addEventListener('keydown',key,true);"
+        "return 'ok';"
+        "})();"),
+        [this](const QVariant &) {
+            statusBar()->showMessage(QStringLiteral("请在页面中点击要截取的元素（Esc 取消）"), 5000);
+        });
+}
+
 // ===================== 媒体控制 =====================
 
 void BrowserWindow::showMediaControl()
@@ -944,6 +1034,7 @@ void BrowserWindow::showCommandPalette()
                 "white-space:pre-wrap;';d.textContent=b;document.body.appendChild(d);})();")); } },
         { QStringLiteral("当前页二维码"), QStringLiteral("qr code erweima"), [this]() { showQrForCurrentPage(); } },
         { QStringLiteral("朗读选中/整页"), QStringLiteral("speak tts langsong"), [this]() { speakSelectionOrPage(); } },
+        { QStringLiteral("元素截图"), QStringLiteral("element screenshot yuansu"), [this]() { captureElement(); } },
         { QStringLiteral("截图当前页"), QStringLiteral("screenshot jietu"), [this]() { capturePage(); } },
         { QStringLiteral("整页截图"), QStringLiteral("fullpage screenshot"), [this]() { captureFullPage(); } },
         { QStringLiteral("打印"), QStringLiteral("print dayin"), [this]() { printPage(); } },
@@ -2781,6 +2872,16 @@ WebView *BrowserWindow::createTabView(bool privateMode)
             statusBar()->clearMessage();
         else
             statusBar()->showMessage(u);
+    });
+
+    // 元素截图
+    connect(view, &WebView::elementRectSelected, this, [this](const QString &json) {
+        const QJsonObject o = QJsonDocument::fromJson(json.toUtf8()).object();
+        const QRect r(o.value(QStringLiteral("x")).toInt(),
+                      o.value(QStringLiteral("y")).toInt(),
+                      o.value(QStringLiteral("w")).toInt(),
+                      o.value(QStringLiteral("h")).toInt());
+        captureRect(r);
     });
 
     // 鼠标手势
