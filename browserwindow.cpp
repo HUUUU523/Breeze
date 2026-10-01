@@ -4310,6 +4310,28 @@ void BrowserWindow::onLoadFinished(bool ok)
     // 按域名恢复页面缩放
     if (view)
         applySavedZoom(view);
+
+    // 注入阅读进度条（页面右侧细条，跟随滚动）
+    if (ok && view) {
+        view->page()->runJavaScript(QStringLiteral(
+            "(function(){"
+            "if(window.__breezeProgress)return;"
+            "window.__breezeProgress=true;"
+            "var bar=document.createElement('div');"
+            "bar.style.cssText='position:fixed;top:0;right:0;width:3px;height:0%;"
+            "background:linear-gradient(180deg,#3498db,#9b59b6);z-index:2147483640;"
+            "transition:height .1s;pointer-events:none;border-radius:0 0 2px 2px;';"
+            "document.body.appendChild(bar);"
+            "function upd(){"
+            "var h=document.documentElement.scrollHeight-window.innerHeight;"
+            "var p=h>0?(window.scrollY/h*100):0;"
+            "bar.style.height=Math.min(100,p)+'%';"
+            "}"
+            "window.addEventListener('scroll',upd,{passive:true});"
+            "window.addEventListener('resize',upd);"
+            "upd();"
+            "})();"));
+    }
 }
 
 void BrowserWindow::navBack()
