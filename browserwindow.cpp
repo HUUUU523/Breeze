@@ -704,6 +704,14 @@ bool BrowserWindow::eventFilter(QObject *obj, QEvent *event)
         showBlockedDetails();
         return true;
     }
+    if (obj == m_tabs->tabBar() && event->type() == QEvent::MouseButtonDblClick) {
+        auto *me = static_cast<QMouseEvent *>(event);
+        // 双击标签栏空白处 → 新建标签
+        if (m_tabs->tabBar()->tabAt(me->position().toPoint()) < 0) {
+            onNewTab();
+            return true;
+        }
+    }
     if (obj == m_tabs->tabBar() && event->type() == QEvent::MouseButtonRelease) {
         auto *me = static_cast<QMouseEvent *>(event);
         if (me->button() == Qt::MiddleButton) {
@@ -2771,6 +2779,31 @@ void BrowserWindow::onUrlEntered()
     QString text = m_urlBar->text().trimmed();
     if (text.isEmpty())
         return;
+
+    // 搜索关键词快捷方式：前缀 + 空格 + 关键词
+    // bd→百度 g→Google bing→Bing gh→GitHub bili→B站 zh→知乎 taobao→淘宝
+    static const QHash<QString, QString> kBang = {
+        { QStringLiteral("bd"),     QStringLiteral("https://www.baidu.com/s?wd=%1") },
+        { QStringLiteral("g"),      QStringLiteral("https://www.google.com/search?q=%1") },
+        { QStringLiteral("bing"),   QStringLiteral("https://www.bing.com/search?q=%1") },
+        { QStringLiteral("gh"),     QStringLiteral("https://github.com/search?q=%1") },
+        { QStringLiteral("bili"),   QStringLiteral("https://search.bilibili.com/all?keyword=%1") },
+        { QStringLiteral("zh"),     QStringLiteral("https://www.zhihu.com/search?q=%1") },
+        { QStringLiteral("taobao"), QStringLiteral("https://s.taobao.com/search?q=%1") },
+    };
+    const int sp = text.indexOf(QLatin1Char(' '));
+    if (sp > 0) {
+        const QString prefix = text.left(sp).toLower();
+        if (kBang.contains(prefix)) {
+            const QString kw = text.mid(sp + 1).trimmed();
+            if (!kw.isEmpty()) {
+                const QString q = QString::fromUtf8(QUrl::toPercentEncoding(kw));
+                view->setUrl(QUrl(kBang.value(prefix).arg(q)));
+                view->setFocus();
+                return;
+            }
+        }
+    }
 
     QUrl url = normalizedUrl(text);
     if (url.isValid()) {
