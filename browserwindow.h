@@ -5,10 +5,12 @@
 #include <QHash>
 #include <QToolButton>
 #include <QMouseEvent>
+#include <QKeyEvent>
 #include <QList>
 #include <QMainWindow>
 #include <QPoint>
 #include <QUrl>
+#include <QVector>
 
 #include <QApplication>
 #include <QDrag>
@@ -130,9 +132,15 @@ public:
     void buildExtensionButtons(class QToolBar *navBar);
     void showExtensionPopup(const struct Extension &ext);
 
+    // ---- 彩蛋 ----
+    void checkKonami();              // 检测 Konami 密码
+    void showEasterEgg();            // 主彩蛋（方块雨）
+    void showFunMessage();           // 每日随机座右铭
+
 protected:
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *obj, QEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;   // 彩蛋：Konami 密码
 
 private slots:
     // ---- 标签页 ----
@@ -330,6 +338,7 @@ private:
     QHash<WebView *, QTimer *> m_refreshTimers;   // 标签 -> 定时刷新定时器
     class QTimer *m_sleepTimer = nullptr;         // 标签休眠检查定时器
     QWidget *m_dragHighlight = nullptr;           // 书签拖拽时高亮的目标
+    QVector<int> m_konamiBuffer;                  // Konami 密码按键缓冲
     class BreezeWebPage *m_bgPage = nullptr;      // 扩展 background 隐藏页
     QUrl                m_homeUrl{"https://www.bing.com"};
 

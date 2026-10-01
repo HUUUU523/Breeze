@@ -313,6 +313,87 @@ void BrowserWindow::notifyPreviousCrash()
     });
 }
 
+void BrowserWindow::keyPressEvent(QKeyEvent *event)
+{
+    // 彩蛋 1：Konami 密码（↑↑↓↓←→←→ B A）
+    m_konamiBuffer.append(event->key());
+    if (m_konamiBuffer.size() > 10)
+        m_konamiBuffer.removeFirst();
+    checkKonami();
+
+    // 彩蛋 2：Ctrl+Shift+E 显示每日座右铭
+    if (event->key() == Qt::Key_E
+        && (event->modifiers() & Qt::ControlModifier)
+        && (event->modifiers() & Qt::ShiftModifier)) {
+        showFunMessage();
+        return;
+    }
+
+    QMainWindow::keyPressEvent(event);
+}
+
+void BrowserWindow::checkKonami()
+{
+    static const QVector<int> kKonami = {
+        Qt::Key_Up, Qt::Key_Up, Qt::Key_Down, Qt::Key_Down,
+        Qt::Key_Left, Qt::Key_Right, Qt::Key_Left, Qt::Key_Right,
+        Qt::Key_B, Qt::Key_A
+    };
+    if (m_konamiBuffer == kKonami) {
+        m_konamiBuffer.clear();
+        showEasterEgg();
+    }
+}
+
+void BrowserWindow::showEasterEgg()
+{
+    // 在页面上撒 100 个彩色方块（纯 JS 注入）
+    WebView *v = currentView();
+    if (!v)
+        return;
+    v->page()->runJavaScript(QStringLiteral(
+        "(function(){"
+        "if(window.__breezeEaster)return;"
+        "window.__breezeEaster=true;"
+        "var colors=['#f38ba8','#fab387','#f9e2af','#a6e3a1','#89b4fa','#cba6f7'];"
+        "for(var i=0;i<120;i++){"
+        "(function(i){"
+        "setTimeout(function(){"
+        "var d=document.createElement('div');"
+        "d.style.cssText='position:fixed;z-index:2147483647;width:10px;height:10px;"
+        "border-radius:2px;pointer-events:none;left:'+(Math.random()*100)+'vw;top:-20px;"
+        "background:'+colors[Math.floor(Math.random()*colors.length)]+';"
+        "transform:rotate('+(Math.random()*360)+'deg);';"
+        "document.body.appendChild(d);"
+        "var top=-20,left=d.offsetLeft;"
+        "var vy=2+Math.random()*4,vx=(Math.random()-0.5)*2;"
+        "var t=setInterval(function(){"
+        "top+=vy;left+=vx;d.style.top=top+'px';d.style.left=left+'px';"
+        "d.style.transform='rotate('+(top*2)+'deg)';"
+        "if(top>window.innerHeight){clearInterval(t);d.remove();}"
+        "},16);"
+        "},i*25);"
+        "})(i);"
+        "}"
+        "})();"));
+    statusBar()->showMessage(QStringLiteral("🎉 Konami 密码已激活！"), 4000);
+}
+
+void BrowserWindow::showFunMessage()
+{
+    static const QStringList kQuotes = {
+        QStringLiteral("程序员的三大美德：懒惰、急躁和傲慢。—— Larry Wall"),
+        QStringLiteral("过早优化是万恶之源。—— Donald Knuth"),
+        QStringLiteral("任何足够先进的技术都与魔法无异。—— Arthur C. Clarke"),
+        QStringLiteral("简单是可靠的先决条件。—— Edsger Dijkstra"),
+        QStringLiteral("在浏览器里，你能看到整个互联网。现在，去创造点什么吧。"),
+        QStringLiteral("代码是写给人看的，只是恰好能在机器上运行。—— Hal Abelson"),
+        QStringLiteral("Stay hungry, stay foolish. —— Steve Jobs"),
+    };
+    const int idx = QDate::currentDate().toJulianDay() % kQuotes.size();
+    statusBar()->showMessage(QStringLiteral("💡 ") + kQuotes.at(idx), 8000);
+}
+
 void BrowserWindow::closeEvent(QCloseEvent *event)
 {
     saveBookmarks();
@@ -2392,10 +2473,75 @@ QString BrowserWindow::dialsHtml() const
   .title { font-size: 12px; color: #888; margin-top: 6px; text-align: center;
            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
   .empty { color: #999; font-size: 15px; }
+  #dino-hint { margin-top: 50px; color: #aaa; font-size: 13px; cursor: pointer; }
+  #dino-hint:hover { color: #3a6ea5; }
 </style></head>
 <body>
   <h1>Breeze</h1>
   <div class="grid">%1</div>
+  <div id="dino-hint">🦖 按空格或点击这里玩小恐龙</div>
+  <canvas id="dino" width="600" height="150" style="display:none;margin-top:20px;
+     background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08)"></canvas>
+<script>
+(function(){
+  var hint=document.getElementById('dino-hint');
+  var cvs=document.getElementById('dino');
+  var ctx=cvs.getContext('2d');
+  var started=false, over=false, score=0, best=Number(localStorage.getItem('breeze-dino-best')||0);
+  var dino={x:50,y:110,w:20,h:22,vy:0,ground:110,jumping:false};
+  var obstacles=[], frame=0, speed=5;
+  function reset(){ over=false; score=0; obstacles=[]; dino.y=dino.ground; dino.vy=0; dino.jumping=false; frame=0; speed=5; }
+  function jump(){ if(dino.jumping)return; dino.jumping=true; dino.vy=-9; }
+  function loop(){
+    if(!started)return;
+    ctx.clearRect(0,0,cvs.width,cvs.height);
+    // 地面
+    ctx.strokeStyle='#ccc'; ctx.beginPath(); ctx.moveTo(0,dino.ground+22);
+    ctx.lineTo(cvs.width,dino.ground+22); ctx.stroke();
+    // 恐龙
+    ctx.fillStyle=over?'#d88':'#555';
+    ctx.fillRect(dino.x,dino.y,dino.w,dino.h);
+    // 重力
+    dino.vy+=0.6; dino.y+=dino.vy;
+    if(dino.y>=dino.ground){dino.y=dino.ground;dino.vy=0;dino.jumping=false;}
+    // 障碍
+    frame++;
+    if(frame%Math.max(40,90-Math.floor(score/3))===0)
+      obstacles.push({x:cvs.width,w:12+Math.random()*10,h:18+Math.random()*14});
+    for(var i=obstacles.length-1;i>=0;i--){
+      var o=obstacles[i]; o.x-=speed;
+      ctx.fillStyle='#a66';
+      ctx.fillRect(o.x,dino.ground+22-o.h,o.w,o.h);
+      // 碰撞
+      if(o.x<dino.x+dino.w && o.x+o.w>dino.x && dino.y+dino.h>dino.ground+22-o.h){
+        over=true;
+        if(score>best){best=score;localStorage.setItem('breeze-dino-best',best);}
+      }
+      if(o.x+o.w<0)obstacles.splice(i,1);
+    }
+    if(!over)score++;
+    // 分数
+    ctx.fillStyle='#888'; ctx.font='14px sans-serif';
+    ctx.fillText('分数 '+score+'   最高 '+best,cvs.width-180,25);
+    if(over){ ctx.fillStyle='#c66'; ctx.font='bold 20px sans-serif';
+      ctx.fillText('游戏结束 - 按空格重来',180,60); }
+    requestAnimationFrame(loop);
+  }
+  function start(){ if(started)return; started=true; hint.style.display='none';
+    cvs.style.display='block'; reset(); loop(); }
+  function onKey(e){
+    if(e.code==='Space'){
+      e.preventDefault();
+      if(!started)start();
+      else if(over){reset();}
+      else jump();
+    }
+  }
+  document.addEventListener('keydown',onKey);
+  hint.addEventListener('click',function(){ start(); jump(); });
+  cvs.addEventListener('click',function(){ if(over)reset(); else jump(); });
+})();
+</script>
 </body></html>
 )HTML").arg(tiles);
 }
