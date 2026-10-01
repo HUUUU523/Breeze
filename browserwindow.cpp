@@ -4562,27 +4562,56 @@ void BrowserWindow::savePageAsHtml()
 }
 
 
+QPixmap BrowserWindow::addWatermark(const QPixmap &src)
+{
+    // 右下角加时间戳水印
+    QPixmap out = src;
+    QPainter p(&out);
+    const QString stamp = QDateTime::currentDateTime().toString(
+        QStringLiteral("Breeze  yyyy-MM-dd HH:mm:ss"));
+    QFont f = p.font();
+    f.setPixelSize(16);
+    f.setBold(true);
+    p.setFont(f);
+    const QFontMetrics fm(f);
+    const int tw = fm.horizontalAdvance(stamp) + 16;
+    const int th = fm.height() + 8;
+    const QRect bg(out.width() - tw - 10, out.height() - th - 10, tw, th);
+    p.fillRect(bg, QColor(0, 0, 0, 140));
+    p.setPen(Qt::white);
+    p.drawText(bg, Qt::AlignCenter, stamp);
+    p.end();
+    return out;
+}
+
 void BrowserWindow::capturePage()
 {
     auto *v = currentView();
     if (!v)
         return;
 
-    const QPixmap shot = v->grab();
+    QPixmap shot = v->grab();
     if (shot.isNull()) {
         QMessageBox::warning(this, QStringLiteral("截图失败"),
                              QStringLiteral("无法捕获当前页面。"));
         return;
     }
 
-    // 询问：保存到文件 / 复制到剪贴板
+    // 询问：保存到文件 / 复制到剪贴板 / 加水印
     QMessageBox box(this);
     box.setWindowTitle(QStringLiteral("截图"));
     box.setText(QStringLiteral("截图完成，选择操作："));
     QPushButton *copyBtn = box.addButton(QStringLiteral("复制到剪贴板"), QMessageBox::AcceptRole);
+    QPushButton *wmBtn = box.addButton(QStringLiteral("加水印后复制"), QMessageBox::ActionRole);
     QPushButton *saveBtn = box.addButton(QStringLiteral("保存为文件…"), QMessageBox::ActionRole);
     box.addButton(QStringLiteral("取消"), QMessageBox::RejectRole);
     box.exec();
+    if (box.clickedButton() == wmBtn) {
+        shot = addWatermark(shot);
+        QApplication::clipboard()->setPixmap(shot);
+        statusBar()->showMessage(QStringLiteral("带水印截图已复制"), 3000);
+        return;
+    }
     if (box.clickedButton() == copyBtn) {
         QApplication::clipboard()->setPixmap(shot);
         statusBar()->showMessage(QStringLiteral("截图已复制到剪贴板"), 3000);

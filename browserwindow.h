@@ -151,6 +151,9 @@ public:
     // ---- 媒体控制 ----
     void showMediaControl();
 
+    // ---- 截图水印 ----
+    static QPixmap addWatermark(const QPixmap &src);
+
     // ---- 页面性能 ----
     void showPagePerformance();
 
