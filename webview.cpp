@@ -342,6 +342,50 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
                 emit newTabRequested(
                     QUrl(QStringLiteral("view-source:") + url().toString()), true);
             });
+            menu.addSeparator();
+
+            // 阅读模式：提取正文，清爽排版
+            menu.addAction(QStringLiteral("📖 阅读模式"), this, [this]() {
+                page()->runJavaScript(QStringLiteral(
+                    "(function(){"
+                    "if(document.getElementById('__breeze_reader__')){"
+                    "document.getElementById('__breeze_reader__').remove();return;}"
+                    "var cands=document.querySelectorAll('article,main,[class*=content],"
+                    "[class*=post],[class*=article],[id*=content],[id*=article]');"
+                    "var best='',bestLen=0;"
+                    "for(var i=0;i<cands.length;i++){"
+                    "var t=cands[i].innerText||'';"
+                    "if(t.length>bestLen){bestLen=t.length;best=t;}}"
+                    "if(!bestLen||bestLen<200)best=document.body.innerText;"
+                    "var d=document.createElement('div');"
+                    "d.id='__breeze_reader__';"
+                    "d.style.cssText='position:fixed;inset:0;z-index:2147483646;"
+                    "background:#faf8f5;color:#333;overflow:auto;padding:60px 20vw;"
+                    "font:18px/1.8 Georgia,serif;white-space:pre-wrap;';"
+                    "d.textContent=best;"
+                    "var btn=document.createElement('button');"
+                    "btn.textContent='× 退出阅读模式';"
+                    "btn.style.cssText='position:fixed;top:20px;right:20px;z-index:2147483647;"
+                    "padding:8px 16px;border:none;border-radius:6px;background:#3a6ea5;"
+                    "color:#fff;font-size:14px;cursor:pointer;';"
+                    "btn.onclick=function(){d.remove();btn.remove();};"
+                    "document.body.appendChild(d);document.body.appendChild(btn);"
+                    "})();"));
+            });
+
+            // 暗黑模式：反色滤镜
+            menu.addAction(QStringLiteral("🌙 暗黑模式（反色）"), this, [this]() {
+                page()->runJavaScript(QStringLiteral(
+                    "(function(){"
+                    "var id='__breeze_dark__';"
+                    "var s=document.getElementById(id);"
+                    "if(s){s.remove();return;}"
+                    "var e=document.createElement('style');e.id=id;"
+                    "e.textContent='html{filter:invert(1) hue-rotate(180deg)!important;}"
+                    "img,video,iframe,canvas,svg{filter:invert(1) hue-rotate(180deg)!important;}';"
+                    "document.head.appendChild(e);"
+                    "})();"));
+            });
 
             connect(back, &QAction::triggered, this, &QWebEngineView::back);
             connect(forward, &QAction::triggered, this, &QWebEngineView::forward);
