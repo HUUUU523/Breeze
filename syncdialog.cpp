@@ -1,4 +1,5 @@
 #include "syncdialog.h"
+#include "profilemanager.h"
 #include "accountmanager.h"
 #include "browserwindow.h"
 #include "syncmanager.h"
@@ -188,7 +189,7 @@ void SyncDialog::setAccount(AccountManager *account)
 
 void SyncDialog::loadConfig()
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     m_urlEdit->setText(s.value(QStringLiteral("sync/url")).toString());
     m_userEdit->setText(s.value(QStringLiteral("sync/user")).toString());
     m_pathEdit->setText(s.value(QStringLiteral("sync/path"),
@@ -197,7 +198,7 @@ void SyncDialog::loadConfig()
 
 void SyncDialog::saveConfig()
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("sync/url"), m_urlEdit->text().trimmed());
     s.setValue(QStringLiteral("sync/user"), m_userEdit->text());
     s.setValue(QStringLiteral("sync/path"), m_pathEdit->text().trimmed());

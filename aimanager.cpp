@@ -1,4 +1,5 @@
 #include "aimanager.h"
+#include "profilemanager.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -17,39 +18,39 @@ AiManager::AiManager(QObject *parent)
 
 QString AiManager::endpoint()
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     return s.value(QStringLiteral("ai/endpoint"),
                    QStringLiteral("https://api.deepseek.com/v1/chat/completions")).toString();
 }
 
 QString AiManager::apiKey()
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     return s.value(QStringLiteral("ai/apiKey")).toString();
 }
 
 QString AiManager::model()
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     return s.value(QStringLiteral("ai/model"),
                    QStringLiteral("deepseek-chat")).toString();
 }
 
 void AiManager::setEndpoint(const QString &url)
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("ai/endpoint"), url.trimmed());
 }
 
 void AiManager::setApiKey(const QString &key)
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("ai/apiKey"), key.trimmed());
 }
 
 void AiManager::setModel(const QString &model)
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("ai/model"), model.trimmed());
 }
 

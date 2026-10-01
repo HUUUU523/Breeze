@@ -1,4 +1,5 @@
 #include "translator.h"
+#include "profilemanager.h"
 
 Translator *Translator::instance()
 {
@@ -9,7 +10,7 @@ Translator *Translator::instance()
 Translator::Translator()
 {
     buildDictionaries();
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     m_lang = s.value(QStringLiteral("i18n/language"), QStringLiteral("zh")).toString();
 }
 
@@ -24,7 +25,7 @@ void Translator::setLanguage(const QString &lang)
     if (v == m_lang)
         return;
     m_lang = v;
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("i18n/language"), m_lang);
     emit languageChanged();
 }

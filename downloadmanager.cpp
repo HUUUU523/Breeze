@@ -1,4 +1,5 @@
 #include "downloadmanager.h"
+#include "profilemanager.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -288,7 +289,7 @@ void DownloadManager::startResumableDownload(const QUrl &url, const QString &sav
     }
 
     // 限速：KB/s，0 = 不限速
-    const int limitKB = QSettings(QStringLiteral("Breeze"), QStringLiteral("Breeze"))
+    const int limitKB = QSettings(QStringLiteral("Breeze"), ProfileManager::settingsAppName())
                             .value(QStringLiteral("download/speedLimitKB"), 0).toInt();
 
     connect(reply, &QNetworkReply::readyRead, this, [reply, out, limitKB]() {
@@ -421,9 +422,7 @@ void DownloadManager::startSegmentedDownload(const QUrl &url, const QString &sav
 
 QString DownloadManager::recordsFilePath() const
 {
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(dir);
-    return dir + QStringLiteral("/downloads.json");
+    return ProfileManager::dataDir() + QStringLiteral("/downloads.json");
 }
 
 void DownloadManager::loadRecords()

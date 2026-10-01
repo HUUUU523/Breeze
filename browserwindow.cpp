@@ -8,6 +8,8 @@
 #include "accountdialog.h"
 #include "accountmanager.h"
 #include "downloadmanager.h"
+#include "profiledialog.h"
+#include "profilemanager.h"
 #include "extension.h"
 #include "extensiondialog.h"
 #include "logger.h"
@@ -167,7 +169,7 @@ void BrowserWindow::migrateLegacyData()
     // 旧版数据写在程序目录；新版写在 AppData。
     // 仅当旧文件存在、且新文件不存在时才迁移，避免覆盖新数据。
     const QString oldDir = QApplication::applicationDirPath();
-    const QString newDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    const QString newDir = ProfileManager::dataDir();
 
     if (oldDir.isEmpty() || newDir.isEmpty() || oldDir == newDir)
         return;
@@ -637,6 +639,7 @@ void BrowserWindow::setupActions()
     QAction *actToolbox = mainMenu->addAction(QStringLiteral("工具箱…"));
     QAction *actTaskMgr = mainMenu->addAction(QStringLiteral("任务管理器…"));
     QAction *actAccount = mainMenu->addAction(QStringLiteral("账号…"));
+    QAction *actProfiles = mainMenu->addAction(QStringLiteral("用户…"));
     QAction *actSync = mainMenu->addAction(QStringLiteral("云同步…"));
     mainMenu->addSeparator();
 
@@ -708,6 +711,10 @@ void BrowserWindow::setupActions()
     connect(actToolbox, &QAction::triggered, this, &BrowserWindow::showToolbox);
     connect(actAccount, &QAction::triggered, this, [this]() {
         AccountDialog dlg(m_account, this);
+        dlg.exec();
+    });
+    connect(actProfiles, &QAction::triggered, this, [this]() {
+        ProfileDialog dlg(this);
         dlg.exec();
     });
     connect(actTaskMgr, &QAction::triggered, this, [this]() {
@@ -875,9 +882,7 @@ void BrowserWindow::setupActions()
 
 QString BrowserWindow::bookmarksFilePath() const
 {
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(dir);
-    return dir + QStringLiteral("/bookmarks.json");
+    return ProfileManager::dataDir() + QStringLiteral("/bookmarks.json");
 }
 
 void BrowserWindow::setupBookmarks()
@@ -1447,9 +1452,7 @@ void BrowserWindow::installUserScriptFromUrl(const QUrl &url)
 
 QString BrowserWindow::historyFilePath() const
 {
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(dir);
-    return dir + QStringLiteral("/history.json");
+    return ProfileManager::dataDir() + QStringLiteral("/history.json");
 }
 
 void BrowserWindow::setupHistory()
@@ -1697,7 +1700,7 @@ void BrowserWindow::setTabPosition(int pos)
     else if (pos == 2) p = QTabWidget::East;
     m_tabs->setTabPosition(p);
 
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("ui/tabPosition"), pos);
     statusBar()->showMessage(
         pos == 0 ? QStringLiteral("标签栏：顶部")
@@ -1709,7 +1712,7 @@ void BrowserWindow::setTabPosition(int pos)
 
 void BrowserWindow::setMouseGesturesEnabled(bool enabled)
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("ui/mouseGestures"), enabled);
 
     for (int i = 0; i < m_tabs->count(); ++i) {
@@ -1802,13 +1805,13 @@ void BrowserWindow::onNewPrivateTab()
 
 QString BrowserWindow::themeMode() const
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     return s.value(QStringLiteral("theme/mode"), QStringLiteral("system")).toString();
 }
 
 void BrowserWindow::setThemeMode(const QString &mode)
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("theme/mode"), mode);
     applyTheme();
 }
@@ -2572,7 +2575,7 @@ void BrowserWindow::clearBrowsingData()
         QWebEngineProfile::defaultProfile()->cookieStore()->deleteAllCookies();
     }
     if (cbDown->isChecked()) {
-        const QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+        const QString path = ProfileManager::dataDir()
             + QStringLiteral("/downloads.json");
         QFile::remove(path);
     }
@@ -3161,7 +3164,7 @@ void BrowserWindow::saveSession() const
         if (u.isValid() && !u.isEmpty())
             urls << u.toString();
     }
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("session/urls"), urls);
     s.setValue(QStringLiteral("session/current"), m_tabs->currentIndex());
 }
@@ -3182,7 +3185,7 @@ void BrowserWindow::restoreSession()
         return;
     }
 
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     const QStringList urls = s.value(QStringLiteral("session/urls")).toStringList();
 
     if (urls.isEmpty()) {
@@ -3227,7 +3230,7 @@ void BrowserWindow::saveNamedSession()
     if (!ok || name.isEmpty())
         return;
 
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.beginGroup(QStringLiteral("namedSessions"));
     s.setValue(name + QStringLiteral("/urls"), urls);
     s.endGroup();
@@ -3238,7 +3241,7 @@ void BrowserWindow::saveNamedSession()
 
 void BrowserWindow::manageSessions()
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.beginGroup(QStringLiteral("namedSessions"));
     const QStringList names = s.childGroups();
     s.endGroup();
@@ -3528,7 +3531,7 @@ void BrowserWindow::saveZoomForView(WebView *view)
     const QString host = view->url().host();
     if (host.isEmpty())
         return;
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("zoom/") + host, view->zoomFactor());
 }
 
@@ -3540,7 +3543,7 @@ void BrowserWindow::applySavedZoom(WebView *view)
     const QString host = view->url().host();
     if (host.isEmpty())
         return;
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     const double f = s.value(QStringLiteral("zoom/") + host, 1.0).toDouble();
     if (f > 0.0 && !qFuzzyCompare(f, 1.0))
         view->setZoomFactor(qBound(0.25, f, 5.0));

@@ -1,4 +1,5 @@
 #include "accountmanager.h"
+#include "profilemanager.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -22,7 +23,7 @@ AccountManager::AccountManager(QObject *parent)
 
 void AccountManager::loadSession()
 {
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     m_accessToken  = s.value(QStringLiteral("account/accessToken")).toString();
     m_refreshToken = s.value(QStringLiteral("account/refreshToken")).toString();
     m_email        = s.value(QStringLiteral("account/email")).toString();
@@ -39,7 +40,7 @@ void AccountManager::clearSession()
     m_userId.clear();
     m_nickname.clear();
     m_avatarUrl.clear();
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.remove(QStringLiteral("account"));
 }
 
@@ -123,7 +124,7 @@ void AccountManager::updateNickname(const QString &nickname)
             return;
         }
         m_nickname = nickname;
-        QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+        QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
         s.setValue(QStringLiteral("account/nickname"), m_nickname);
         emit nicknameUpdated(true, QStringLiteral("昵称已更新"));
     });
@@ -193,7 +194,7 @@ void AccountManager::handleAuthReply(QNetworkReply *reply, bool isSignUp)
     m_nickname  = meta.value(QStringLiteral("nickname")).toString();
     m_avatarUrl = meta.value(QStringLiteral("avatar_url")).toString();
 
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("account/accessToken"), m_accessToken);
     s.setValue(QStringLiteral("account/refreshToken"), m_refreshToken);
     s.setValue(QStringLiteral("account/email"), m_email);

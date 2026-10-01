@@ -1,4 +1,5 @@
 #include "adblocker.h"
+#include "profilemanager.h"
 
 #include <QSettings>
 #include <QUrl>
@@ -9,7 +10,7 @@ AdBlocker::AdBlocker(QObject *parent)
     loadBuiltinRules();
 
     // 读取开关和自定义规则
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     m_enabled = s.value(QStringLiteral("adblock/enabled"), true).toBool();
     m_httpsUpgrade = s.value(QStringLiteral("adblock/httpsUpgrade"), false).toBool();
     m_customRules = s.value(QStringLiteral("adblock/rules")).toStringList();
@@ -61,14 +62,14 @@ void AdBlocker::loadBuiltinRules()
 void AdBlocker::setEnabled(bool enabled)
 {
     m_enabled = enabled;
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("adblock/enabled"), enabled);
 }
 
 void AdBlocker::setHttpsUpgrade(bool enabled)
 {
     m_httpsUpgrade = enabled;
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("adblock/httpsUpgrade"), enabled);
 }
 
@@ -79,7 +80,7 @@ void AdBlocker::addRule(const QString &rule)
         return;
     m_customRules.append(r);
     m_domains.insert(r);
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("adblock/rules"), m_customRules);
 }
 
@@ -89,7 +90,7 @@ void AdBlocker::removeRule(const QString &rule)
     m_customRules.removeAll(r);
     // 内置规则不移除（仅移除自定义）
     m_domains.remove(r);
-    QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+    QSettings s(QStringLiteral("Breeze"), ProfileManager::settingsAppName());
     s.setValue(QStringLiteral("adblock/rules"), m_customRules);
 }
 

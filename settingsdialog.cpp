@@ -18,8 +18,10 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
+#include "profilemanager.h"
 static const char *kOrg = "Breeze";
-static const char *kApp = "Breeze";
+// kApp 改为按当前用户隔离（见 kAppName()）
+static QString kAppName() { return ProfileManager::settingsAppName(); }
 
 SettingsDialog::SettingsDialog(QWidget *parent)
     : QDialog(parent)
@@ -206,39 +208,39 @@ void SettingsDialog::onAccepted()
 
 QString SettingsDialog::homePage()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("homePage"),
                    QStringLiteral("https://www.bing.com")).toString();
 }
 
 QString SettingsDialog::searchEngine()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("searchEngine"), QStringLiteral("Bing")).toString();
 }
 
 bool SettingsDialog::recordHistory()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("recordHistory"), true).toBool();
 }
 
 void SettingsDialog::setHomePage(const QString &url)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("homePage"), url.isEmpty()
                    ? QStringLiteral("https://www.bing.com") : url);
 }
 
 void SettingsDialog::setSearchEngine(const QString &engine)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("searchEngine"), engine);
 }
 
 void SettingsDialog::setRecordHistory(bool enabled)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("recordHistory"), enabled);
 }
 
@@ -257,38 +259,38 @@ QString SettingsDialog::searchUrlTemplate(const QString &engineName)
 
 QString SettingsDialog::proxyType()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("proxy/type"), QStringLiteral("none")).toString();
 }
 
 QString SettingsDialog::proxyHost()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("proxy/host")).toString();
 }
 
 int SettingsDialog::proxyPort()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("proxy/port"), 0).toInt();
 }
 
 QString SettingsDialog::proxyUser()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("proxy/user")).toString();
 }
 
 QString SettingsDialog::proxyPassword()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("proxy/password")).toString();
 }
 
 void SettingsDialog::setProxy(const QString &type, const QString &host, int port,
                               const QString &user, const QString &password)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("proxy/type"), type);
     s.setValue(QStringLiteral("proxy/host"), host);
     s.setValue(QStringLiteral("proxy/port"), port);
@@ -298,109 +300,109 @@ void SettingsDialog::setProxy(const QString &type, const QString &host, int port
 
 int SettingsDialog::downloadSpeedLimit()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("download/speedLimitKB"), 0).toInt();
 }
 
 void SettingsDialog::setDownloadSpeedLimit(int kbPerSec)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("download/speedLimitKB"), qMax(0, kbPerSec));
 }
 
 QString SettingsDialog::downloadDirectory()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("download/directory")).toString();
 }
 
 void SettingsDialog::setDownloadDirectory(const QString &dir)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("download/directory"), dir.trimmed());
 }
 
 bool SettingsDialog::openFileAfterDownload()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("download/openAfterFinish"), false).toBool();
 }
 
 void SettingsDialog::setOpenFileAfterDownload(bool on)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("download/openAfterFinish"), on);
 }
 
 QString SettingsDialog::dohTemplate()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("net/dohTemplate")).toString();
 }
 
 void SettingsDialog::setDohTemplate(const QString &tpl)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("net/dohTemplate"), tpl.trimmed());
 }
 
 int SettingsDialog::minFontSize()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("web/minFontSize"), 0).toInt();
 }
 
 void SettingsDialog::setMinFontSize(int px)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("web/minFontSize"), qMax(0, px));
 }
 
 int SettingsDialog::defaultFontSize()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("web/defaultFontSize"), 0).toInt();
 }
 
 void SettingsDialog::setDefaultFontSize(int px)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("web/defaultFontSize"), qMax(0, px));
 }
 
 bool SettingsDialog::checkUpdateOnStartup()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("update/checkOnStartup"), false).toBool();
 }
 
 void SettingsDialog::setCheckUpdateOnStartup(bool enabled)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("update/checkOnStartup"), enabled);
 }
 
 int SettingsDialog::startupBehavior()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("startup/behavior"), 0).toInt();
 }
 
 void SettingsDialog::setStartupBehavior(int mode)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("startup/behavior"), mode);
 }
 
 int SettingsDialog::newTabBehavior()
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     return s.value(QStringLiteral("newtab/behavior"), 0).toInt();
 }
 
 void SettingsDialog::setNewTabBehavior(int mode)
 {
-    QSettings s(kOrg, kApp);
+    QSettings s(kOrg, kAppName());
     s.setValue(QStringLiteral("newtab/behavior"), mode);
 }
 
