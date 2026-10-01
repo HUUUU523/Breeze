@@ -238,6 +238,8 @@ private slots:
     void zoomIn();
     void zoomOut();
     void zoomReset();
+    void increaseFontSize();
+    void decreaseFontSize();
     void printPage();
     void savePageAsPdf();
     void savePageAsHtml();      // 保存为 MHTML

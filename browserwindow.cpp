@@ -1128,6 +1128,8 @@ void BrowserWindow::showCommandPalette()
         { QStringLiteral("朗读选中/整页"), QStringLiteral("speak tts langsong"), [this]() { speakSelectionOrPage(); } },
         { QStringLiteral("元素截图"), QStringLiteral("element screenshot yuansu"), [this]() { captureElement(); } },
         { QStringLiteral("页面性能"), QStringLiteral("performance xingneng"), [this]() { showPagePerformance(); } },
+        { QStringLiteral("增大网页字号"), QStringLiteral("font bigger zihao"), [this]() { increaseFontSize(); } },
+        { QStringLiteral("减小网页字号"), QStringLiteral("font smaller zihao"), [this]() { decreaseFontSize(); } },
         { QStringLiteral("截图当前页"), QStringLiteral("screenshot jietu"), [this]() { capturePage(); } },
         { QStringLiteral("整页截图"), QStringLiteral("fullpage screenshot"), [this]() { captureFullPage(); } },
         { QStringLiteral("打印"), QStringLiteral("print dayin"), [this]() { printPage(); } },
@@ -1769,6 +1771,8 @@ void BrowserWindow::setupActions()
     addShortcut(QKeySequence::ZoomIn,  [this]{ zoomIn(); });     // Ctrl+=
     addShortcut(QKeySequence::ZoomOut, [this]{ zoomOut(); });    // Ctrl+-
     addShortcut(QKeySequence(QStringLiteral("Ctrl+0")), [this]{ zoomReset(); });
+    addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+=")), [this]{ increaseFontSize(); });
+    addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+-")), [this]{ decreaseFontSize(); });
 
     addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+N")), [this]{ onNewPrivateTab(); });
     addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+T")), [this]{ onReopenClosedTab(); });
@@ -4757,6 +4761,36 @@ void BrowserWindow::zoomReset()
         v->setZoomFactor(1.0);
         saveZoomForView(v);
     }
+}
+
+void BrowserWindow::increaseFontSize()
+{
+    WebView *v = currentView();
+    if (!v)
+        return;
+    int size = v->property("breezeFontSize").toInt();
+    if (size <= 0) size = 16;
+    size = qMin(size + 2, 40);
+    v->setProperty("breezeFontSize", size);
+    v->page()->runJavaScript(QStringLiteral(
+        "document.documentElement.style.fontSize='%1px';"
+        "document.body.style.fontSize='%1px';").arg(size));
+    statusBar()->showMessage(QStringLiteral("网页字号：%1px").arg(size), 1500);
+}
+
+void BrowserWindow::decreaseFontSize()
+{
+    WebView *v = currentView();
+    if (!v)
+        return;
+    int size = v->property("breezeFontSize").toInt();
+    if (size <= 0) size = 16;
+    size = qMax(size - 2, 8);
+    v->setProperty("breezeFontSize", size);
+    v->page()->runJavaScript(QStringLiteral(
+        "document.documentElement.style.fontSize='%1px';"
+        "document.body.style.fontSize='%1px';").arg(size));
+    statusBar()->showMessage(QStringLiteral("网页字号：%1px").arg(size), 1500);
 }
 
 void BrowserWindow::applyZoom(double delta)
