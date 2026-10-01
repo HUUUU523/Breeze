@@ -112,6 +112,9 @@ BrowserWindow::BrowserWindow(QWidget *parent)
     setupHistory();
     loadReadingList();
     loadNotes();
+    loadClipboardHistory();
+    connect(QApplication::clipboard(), &QClipboard::dataChanged,
+            this, &BrowserWindow::recordClipboard);
 
     // 启动时恢复上次会话；若无会话则打开主页
     restoreSession();
@@ -407,6 +410,105 @@ void BrowserWindow::showFunMessage()
     };
     const int idx = QDate::currentDate().toJulianDay() % kQuotes.size();
     statusBar()->showMessage(QStringLiteral("💡 ") + kQuotes.at(idx), 8000);
+}
+
+// ===================== 剪贴板历史 =====================
+
+void BrowserWindow::loadClipboardHistory()
+{
+    const QString path = ProfileManager::dataDir() + QStringLiteral("/cliphistory.json");
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return;
+    const QJsonArray arr = QJsonDocument::fromJson(f.readAll()).array();
+    m_clipHistory.clear();
+    for (const QJsonValue &v : arr)
+        if (v.isString())
+            m_clipHistory << v.toString();
+}
+
+void BrowserWindow::saveClipboardHistory() const
+{
+    QJsonArray arr;
+    for (const QString &s : m_clipHistory)
+        arr.append(s);
+    const QString path = ProfileManager::dataDir() + QStringLiteral("/cliphistory.json");
+    QFile f(path);
+    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        f.write(QJsonDocument(arr).toJson(QJsonDocument::Indented));
+}
+
+void BrowserWindow::recordClipboard()
+{
+    const QString text = QApplication::clipboard()->text();
+    if (text.isEmpty() || text == m_lastClip)
+        return;
+    m_lastClip = text;
+    // 去重后前插
+    m_clipHistory.removeAll(text);
+    m_clipHistory.prepend(text);
+    while (m_clipHistory.size() > 100)
+        m_clipHistory.removeLast();
+    saveClipboardHistory();
+}
+
+void BrowserWindow::showClipboardHistory()
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("剪贴板历史 - Breeze"));
+    dlg.resize(520, 420);
+    auto *lay = new QVBoxLayout(&dlg);
+    lay->addWidget(new QLabel(
+        QStringLiteral("最近复制过的文本（最多 100 条，跨应用）。双击可重新复制。"), &dlg));
+
+    auto *list = new QListWidget(&dlg);
+    for (const QString &s : m_clipHistory) {
+        QString preview = s;
+        preview.replace(QLatin1Char('\n'), QLatin1Char(' '));
+        if (preview.size() > 80)
+            preview = preview.left(80) + QStringLiteral("…");
+        auto *it = new QListWidgetItem(preview, list);
+        it->setData(Qt::UserRole, s);
+        it->setToolTip(s.left(500));
+    }
+    lay->addWidget(list);
+
+    auto *row = new QHBoxLayout;
+    auto *copyBtn = new QPushButton(QStringLiteral("复制选中"), &dlg);
+    auto *delBtn = new QPushButton(QStringLiteral("删除选中"), &dlg);
+    auto *clearBtn = new QPushButton(QStringLiteral("清空全部"), &dlg);
+    auto *closeBtn = new QPushButton(QStringLiteral("关闭"), &dlg);
+    row->addWidget(copyBtn);
+    row->addWidget(delBtn);
+    row->addStretch();
+    row->addWidget(clearBtn);
+    row->addWidget(closeBtn);
+    lay->addLayout(row);
+
+    auto copyCurrent = [&]() {
+        auto *it = list->currentItem();
+        if (!it) return;
+        const QString s = it->data(Qt::UserRole).toString();
+        QApplication::clipboard()->setText(s);
+        m_lastClip = s;   // 避免再次记录
+        statusBar()->showMessage(QStringLiteral("已复制到剪贴板"), 2000);
+    };
+    connect(list, &QListWidget::itemDoubleClicked, &dlg, [&](QListWidgetItem *) { copyCurrent(); });
+    connect(copyBtn, &QPushButton::clicked, &dlg, copyCurrent);
+    connect(delBtn, &QPushButton::clicked, &dlg, [&]() {
+        auto *it = list->currentItem();
+        if (!it) return;
+        m_clipHistory.removeAll(it->data(Qt::UserRole).toString());
+        saveClipboardHistory();
+        delete list->takeItem(list->row(it));
+    });
+    connect(clearBtn, &QPushButton::clicked, &dlg, [&]() {
+        m_clipHistory.clear();
+        saveClipboardHistory();
+        list->clear();
+    });
+    connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+    dlg.exec();
 }
 
 // ===================== 网页笔记 =====================
@@ -1235,6 +1337,7 @@ void BrowserWindow::setupActions()
     QAction *actProfiles = mainMenu->addAction(QStringLiteral("用户…"));
     QAction *actReading = mainMenu->addAction(QStringLiteral("稍后读…"));
     QAction *actNote = mainMenu->addAction(QStringLiteral("📝 网页笔记…"));
+    QAction *actClip = mainMenu->addAction(QStringLiteral("📋 剪贴板历史…"));
     QAction *actMedia = mainMenu->addAction(QStringLiteral("媒体控制…"));
     QAction *actFocus = mainMenu->addAction(QStringLiteral("🍅 专注模式…"));
     QAction *actFocusStop = mainMenu->addAction(QStringLiteral("停止专注"));
@@ -1318,6 +1421,7 @@ void BrowserWindow::setupActions()
     });
     connect(actReading, &QAction::triggered, this, &BrowserWindow::showReadingList);
     connect(actNote, &QAction::triggered, this, &BrowserWindow::showNoteForCurrentPage);
+    connect(actClip, &QAction::triggered, this, &BrowserWindow::showClipboardHistory);
     connect(actMedia, &QAction::triggered, this, &BrowserWindow::showMediaControl);
     connect(actFocus, &QAction::triggered, this, &BrowserWindow::startFocusMode);
     connect(actFocusStop, &QAction::triggered, this, &BrowserWindow::stopFocusMode);
