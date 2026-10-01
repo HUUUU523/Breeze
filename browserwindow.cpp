@@ -35,6 +35,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QShortcut>
+#include <QTextEdit>
 #include <QApplication>
 #include <QCloseEvent>
 #include <QCompleter>
@@ -1294,6 +1295,68 @@ void BrowserWindow::setupActions()
     // ---- 打印 / 导出 PDF ----
     addShortcut(QKeySequence::Print, [this]{ printPage(); });  // Ctrl+P
     addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+P")), [this]{ savePageAsPdf(); });
+
+    // ---- F1：快捷键速查表 ----
+    addShortcut(QKeySequence(Qt::Key_F1), [this]() {
+        QDialog dlg(this);
+        dlg.setWindowTitle(QStringLiteral("快捷键 - Breeze"));
+        dlg.resize(480, 560);
+        auto *lay = new QVBoxLayout(&dlg);
+        auto *edit = new QTextEdit(&dlg);
+        edit->setReadOnly(true);
+        edit->setHtml(QStringLiteral(
+            "<h3>标签与窗口</h3>"
+            "<table cellpadding=4>"
+            "<tr><td><b>Ctrl+T</b></td><td>新建标签页</td></tr>"
+            "<tr><td><b>Ctrl+W</b></td><td>关闭当前标签</td></tr>"
+            "<tr><td><b>Ctrl+Shift+N</b></td><td>新建隐私标签</td></tr>"
+            "<tr><td><b>Ctrl+Shift+T</b></td><td>恢复关闭的标签</td></tr>"
+            "<tr><td><b>Ctrl+Tab / Ctrl+Shift+Tab</b></td><td>切换标签</td></tr>"
+            "<tr><td><b>Ctrl+1~8 / Ctrl+9</b></td><td>跳转到第 N 个 / 最后一个标签</td></tr>"
+            "<tr><td><b>Ctrl+Shift+A</b></td><td>标签搜索</td></tr>"
+            "<tr><td><b>双击标签栏空白</b></td><td>新建标签</td></tr>"
+            "<tr><td><b>中键点击标签</b></td><td>关闭标签</td></tr>"
+            "<tr><td><b>标签栏滚轮</b></td><td>切换标签</td></tr>"
+            "</table>"
+            "<h3>导航</h3>"
+            "<table cellpadding=4>"
+            "<tr><td><b>Ctrl+L</b></td><td>聚焦地址栏</td></tr>"
+            "<tr><td><b>F5 / Ctrl+R</b></td><td>刷新</td></tr>"
+            "<tr><td><b>Alt+←/→</b></td><td>后退 / 前进</td></tr>"
+            "<tr><td><b>Ctrl+F</b></td><td>页面内查找</td></tr>"
+            "<tr><td><b>Ctrl+= / Ctrl+- / Ctrl+0</b></td><td>放大 / 缩小 / 重置</td></tr>"
+            "</table>"
+            "<h3>功能</h3>"
+            "<table cellpadding=4>"
+            "<tr><td><b>Ctrl+K</b></td><td>命令面板</td></tr>"
+            "<tr><td><b>Ctrl+D</b></td><td>收藏当前页</td></tr>"
+            "<tr><td><b>Ctrl+B</b></td><td>显示/隐藏书签栏</td></tr>"
+            "<tr><td><b>Ctrl+P</b></td><td>打印</td></tr>"
+            "<tr><td><b>Ctrl+Shift+P</b></td><td>保存为 PDF</td></tr>"
+            "<tr><td><b>Ctrl+Shift+E</b></td><td>今日座右铭</td></tr>"
+            "<tr><td><b>F1</b></td><td>本速查表</td></tr>"
+            "</table>"
+            "<h3>彩蛋</h3>"
+            "<table cellpadding=4>"
+            "<tr><td><b>↑↑↓↓←→←→BA</b></td><td>方块雨</td></tr>"
+            "<tr><td><b>右键画线</b></td><td>鼠标手势（←后退 →前进 ↑刷新 ↓关闭）</td></tr>"
+            "</table>"
+            "<h3>地址栏快捷搜索</h3>"
+            "<table cellpadding=4>"
+            "<tr><td><b>bd 关键词</b></td><td>百度</td></tr>"
+            "<tr><td><b>g 关键词</b></td><td>Google</td></tr>"
+            "<tr><td><b>bing 关键词</b></td><td>Bing</td></tr>"
+            "<tr><td><b>gh 关键词</b></td><td>GitHub</td></tr>"
+            "<tr><td><b>bili 关键词</b></td><td>B站</td></tr>"
+            "<tr><td><b>zh 关键词</b></td><td>知乎</td></tr>"
+            "<tr><td><b>taobao 关键词</b></td><td>淘宝</td></tr>"
+            "</table>"));
+        lay->addWidget(edit);
+        auto *closeBtn = new QPushButton(QStringLiteral("关闭"), &dlg);
+        lay->addWidget(closeBtn);
+        connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+        dlg.exec();
+    });
 
     // ---- 盾牌：拦截计数 ----
     connect(m_adBlocker, &AdBlocker::blockedCountChanged, this,
