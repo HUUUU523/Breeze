@@ -5,6 +5,8 @@
 #include "aisidebar.h"
 #include "bookmarksidebar.h"
 #include "cookiemanagerdialog.h"
+#include "accountdialog.h"
+#include "accountmanager.h"
 #include "downloadmanager.h"
 #include "extension.h"
 #include "extensiondialog.h"
@@ -99,6 +101,7 @@ BrowserWindow::BrowserWindow(QWidget *parent)
     setupActions();
     setupBookmarks();
     setupDownloads();
+    setupAccount();
     setupHistory();
 
     // 启动时恢复上次会话；若无会话则打开主页
@@ -633,6 +636,7 @@ void BrowserWindow::setupActions()
     QAction *actExt = mainMenu->addAction(QStringLiteral("扩展管理…"));
     QAction *actToolbox = mainMenu->addAction(QStringLiteral("工具箱…"));
     QAction *actTaskMgr = mainMenu->addAction(QStringLiteral("任务管理器…"));
+    QAction *actAccount = mainMenu->addAction(QStringLiteral("账号…"));
     QAction *actSync = mainMenu->addAction(QStringLiteral("云同步…"));
     mainMenu->addSeparator();
 
@@ -702,6 +706,10 @@ void BrowserWindow::setupActions()
         dlg.exec();
     });
     connect(actToolbox, &QAction::triggered, this, &BrowserWindow::showToolbox);
+    connect(actAccount, &QAction::triggered, this, [this]() {
+        AccountDialog dlg(m_account, this);
+        dlg.exec();
+    });
     connect(actTaskMgr, &QAction::triggered, this, [this]() {
         TaskManagerDialog dlg(this);
         QList<WebView *> tabs;
@@ -1341,6 +1349,14 @@ void BrowserWindow::editBookmark(const QUrl &url)
     saveBookmarks();
     rebuildBookmarkBar();
     statusBar()->showMessage(QStringLiteral("书签已更新"), 2000);
+}
+
+// ===================== 账号 =====================
+
+void BrowserWindow::setupAccount()
+{
+    m_account = new AccountManager(this);
+    m_account->loadSession();
 }
 
 // ===================== 下载 =====================

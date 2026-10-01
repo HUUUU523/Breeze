@@ -34,6 +34,7 @@ class QWebEngineProfile;
 class WebView;
 class AdBlocker;
 class DownloadManager;
+class AccountManager;
 class HistoryDialog;
 
 // 单条书签
@@ -168,6 +169,7 @@ private slots:
 
     // ---- 下载 / 历史 ----
     void setupDownloads();
+    void setupAccount();
     void showDownloads();
     void setupHistory();
     void showHistory();
@@ -333,6 +335,7 @@ private:
 
     // ---- 子系统 ----
     DownloadManager   *m_downloadManager = nullptr;
+    AccountManager    *m_account = nullptr;
     class UpdateManager *m_updateManager = nullptr;
     bool m_silentUpdateCheck = false;
     AdBlocker         *m_adBlocker       = nullptr;

@@ -47,6 +47,10 @@ qt_add_executable(Breeze WIN32
     bookmarkmanager.cpp
     syncmanager.h
     syncmanager.cpp
+    accountmanager.h
+    accountmanager.cpp
+    accountdialog.h
+    accountdialog.cpp
     syncdialog.h
     syncdialog.cpp
     userscriptmanager.h
