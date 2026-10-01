@@ -27,6 +27,8 @@ void AccountManager::loadSession()
     m_refreshToken = s.value(QStringLiteral("account/refreshToken")).toString();
     m_email        = s.value(QStringLiteral("account/email")).toString();
     m_userId       = s.value(QStringLiteral("account/userId")).toString();
+    m_nickname     = s.value(QStringLiteral("account/nickname")).toString();
+    m_avatarUrl    = s.value(QStringLiteral("account/avatarUrl")).toString();
 }
 
 void AccountManager::clearSession()
@@ -35,6 +37,8 @@ void AccountManager::clearSession()
     m_refreshToken.clear();
     m_email.clear();
     m_userId.clear();
+    m_nickname.clear();
+    m_avatarUrl.clear();
     QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
     s.remove(QStringLiteral("account"));
 }
@@ -77,6 +81,52 @@ void AccountManager::signOut()
 {
     clearSession();
     emit signOutFinished();
+}
+
+QString AccountManager::displayName() const
+{
+    if (!m_nickname.isEmpty())
+        return m_nickname;
+    if (!m_email.isEmpty())
+        return m_email.section(QLatin1Char('@'), 0, 0);
+    return QString();
+}
+
+void AccountManager::updateNickname(const QString &nickname)
+{
+    if (m_accessToken.isEmpty()) {
+        emit nicknameUpdated(false, QStringLiteral("未登录"));
+        return;
+    }
+
+    QNetworkRequest req{QUrl(QString::fromLatin1(kSupabaseUrl)
+                             + QStringLiteral("/auth/v1/user"))};
+    req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    req.setRawHeader("apikey", kSupabaseKey);
+    req.setRawHeader("Authorization", "Bearer " + m_accessToken.toUtf8());
+
+    QJsonObject meta;
+    meta.insert(QStringLiteral("nickname"), nickname);
+    QJsonObject body;
+    body.insert(QStringLiteral("data"), meta);
+
+    QNetworkReply *reply = m_net->sendCustomRequest(
+        req, "PUT", QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, nickname]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            const QJsonObject o = QJsonDocument::fromJson(reply->readAll()).object();
+            QString msg = o.value(QStringLiteral("msg")).toString();
+            if (msg.isEmpty())
+                msg = reply->errorString();
+            emit nicknameUpdated(false, msg);
+            return;
+        }
+        m_nickname = nickname;
+        QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
+        s.setValue(QStringLiteral("account/nickname"), m_nickname);
+        emit nicknameUpdated(true, QStringLiteral("昵称已更新"));
+    });
 }
 
 void AccountManager::resetPassword(const QString &email)
@@ -139,12 +189,17 @@ void AccountManager::handleAuthReply(QNetworkReply *reply, bool isSignUp)
     const QJsonObject user = obj.value(QStringLiteral("user")).toObject();
     m_email  = user.value(QStringLiteral("email")).toString();
     m_userId = user.value(QStringLiteral("id")).toString();
+    const QJsonObject meta = user.value(QStringLiteral("user_metadata")).toObject();
+    m_nickname  = meta.value(QStringLiteral("nickname")).toString();
+    m_avatarUrl = meta.value(QStringLiteral("avatar_url")).toString();
 
     QSettings s(QStringLiteral("Breeze"), QStringLiteral("Breeze"));
     s.setValue(QStringLiteral("account/accessToken"), m_accessToken);
     s.setValue(QStringLiteral("account/refreshToken"), m_refreshToken);
     s.setValue(QStringLiteral("account/email"), m_email);
     s.setValue(QStringLiteral("account/userId"), m_userId);
+    s.setValue(QStringLiteral("account/nickname"), m_nickname);
+    s.setValue(QStringLiteral("account/avatarUrl"), m_avatarUrl);
 
     if (isSignUp)
         emit signUpFinished(true, QStringLiteral("注册并登录成功：") + m_email);

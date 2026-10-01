@@ -2,6 +2,7 @@
 #include "accountmanager.h"
 
 #include <QFormLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
@@ -57,6 +58,16 @@ AccountDialog::AccountDialog(AccountManager *account, QWidget *parent)
 
     layout->addWidget(m_tabs);
 
+    // 昵称编辑（登录后可用）
+    auto *nickRow = new QHBoxLayout;
+    m_nicknameEdit = new QLineEdit(this);
+    m_nicknameEdit->setPlaceholderText(QStringLiteral("昵称"));
+    m_saveNicknameBtn = new QPushButton(QStringLiteral("保存昵称"), this);
+    nickRow->addWidget(new QLabel(QStringLiteral("昵称："), this));
+    nickRow->addWidget(m_nicknameEdit, 1);
+    nickRow->addWidget(m_saveNicknameBtn);
+    layout->addLayout(nickRow);
+
     m_signOutBtn = new QPushButton(QStringLiteral("退出登录"), this);
     layout->addWidget(m_signOutBtn);
 
@@ -76,6 +87,20 @@ AccountDialog::AccountDialog(AccountManager *account, QWidget *parent)
             });
     connect(m_account, &AccountManager::signOutFinished, this,
             [this]() { refreshUi(); });
+    connect(m_saveNicknameBtn, &QPushButton::clicked, this, [this]() {
+        const QString nick = m_nicknameEdit->text().trimmed();
+        if (nick.isEmpty()) {
+            QMessageBox::warning(this, QStringLiteral("账号"),
+                                 QStringLiteral("昵称不能为空。"));
+            return;
+        }
+        m_account->updateNickname(nick);
+    });
+    connect(m_account, &AccountManager::nicknameUpdated, this,
+            [this](bool ok, const QString &msg) {
+                if (ok) { QMessageBox::information(this, QStringLiteral("账号"), msg); refreshUi(); }
+                else    { QMessageBox::warning(this, QStringLiteral("账号"), msg); }
+            });
     connect(m_account, &AccountManager::resetPasswordFinished, this,
             [this](bool ok, const QString &msg) {
                 if (ok) QMessageBox::information(this, QStringLiteral("忘记密码"), msg);
@@ -139,12 +164,19 @@ void AccountDialog::refreshUi()
 {
     const bool logged = m_account->isLoggedIn();
     if (logged) {
-        m_status->setText(QStringLiteral("已登录：<b>%1</b>").arg(m_account->email()));
+        m_status->setText(QStringLiteral("已登录：<b>%1</b>（%2）")
+            .arg(m_account->displayName(), m_account->email()));
         m_tabs->setEnabled(false);
         m_signOutBtn->setEnabled(true);
+        m_nicknameEdit->setEnabled(true);
+        m_saveNicknameBtn->setEnabled(true);
+        m_nicknameEdit->setText(m_account->nickname());
     } else {
         m_status->setText(QStringLiteral("未登录"));
         m_tabs->setEnabled(true);
         m_signOutBtn->setEnabled(false);
+        m_nicknameEdit->clear();
+        m_nicknameEdit->setEnabled(false);
+        m_saveNicknameBtn->setEnabled(false);
     }
 }

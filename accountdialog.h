@@ -34,6 +34,8 @@ private:
     QLineEdit   *m_regPass = nullptr;
     QLineEdit   *m_regPass2 = nullptr;
     QLabel      *m_status = nullptr;
+    QLineEdit   *m_nicknameEdit = nullptr;
+    QPushButton *m_saveNicknameBtn = nullptr;
     QPushButton *m_signOutBtn = nullptr;
 };
 

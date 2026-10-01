@@ -18,6 +18,9 @@ public:
     bool isLoggedIn() const { return !m_accessToken.isEmpty(); }
     QString email() const { return m_email; }
     QString userId() const { return m_userId; }
+    QString nickname() const { return m_nickname; }
+    QString avatarUrl() const { return m_avatarUrl; }
+    QString displayName() const;   // 昵称优先，回退到 email 前缀
 
     // 从 QSettings 恢复/保存会话
     void loadSession();
@@ -28,12 +31,14 @@ public:
     void signIn(const QString &email, const QString &password);
     void signOut();
     void resetPassword(const QString &email);   // 发送重置密码邮件
+    void updateNickname(const QString &nickname);  // 修改昵称
 
 signals:
     void signUpFinished(bool ok, const QString &message);
     void signInFinished(bool ok, const QString &message);
     void signOutFinished();
     void resetPasswordFinished(bool ok, const QString &message);
+    void nicknameUpdated(bool ok, const QString &message);
 
 private:
     void handleAuthReply(class QNetworkReply *reply, bool isSignUp);
@@ -43,6 +48,8 @@ private:
     QString m_refreshToken;
     QString m_email;
     QString m_userId;
+    QString m_nickname;
+    QString m_avatarUrl;
 };
 
 #endif // ACCOUNTMANAGER_H
