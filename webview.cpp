@@ -344,6 +344,22 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
                         [this, t]() { emit aiActionRequested(QStringLiteral("translate"), t); });
                 connect(aiMenu->addAction(QStringLiteral("改写")), &QAction::triggered, this,
                         [this, t]() { emit aiActionRequested(QStringLiteral("rewrite"), t); });
+
+                // 高亮选中文字
+                menu.addAction(QStringLiteral("🖍 高亮选中"), this, [this]() {
+                    page()->runJavaScript(QStringLiteral(
+                        "(function(){"
+                        "var s=window.getSelection();"
+                        "if(!s.rangeCount)return;"
+                        "var r=s.getRangeAt(0);"
+                        "var span=document.createElement('mark');"
+                        "span.style.cssText='background:#ffe066;padding:1px 2px;border-radius:2px;';"
+                        "span.setAttribute('data-breeze-mark','1');"
+                        "try{span.appendChild(r.extractContents());r.insertNode(span);}"
+                        "catch(e){}"
+                        "s.removeAllRanges();"
+                        "})();"));
+                });
                 menu.addSeparator();
             }
 
@@ -397,6 +413,14 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
             menu.addAction(QStringLiteral("查看源代码"), this, [this]() {
                 emit newTabRequested(
                     QUrl(QStringLiteral("view-source:") + url().toString()), true);
+            });
+            menu.addAction(QStringLiteral("清除本页高亮"), this, [this]() {
+                page()->runJavaScript(QStringLiteral(
+                    "(function(){"
+                    "document.querySelectorAll('mark[data-breeze-mark]').forEach(function(m){"
+                    "var t=document.createTextNode(m.textContent);"
+                    "m.parentNode.replaceChild(t,m);});"
+                    "})();"));
             });
             menu.addSeparator();
 

@@ -19,6 +19,7 @@
 #include <QPixmap>
 
 #include "historymanager.h"
+#include "readinglistmanager.h"
 
 class QCloseEvent;
 class QLineEdit;
@@ -140,6 +141,12 @@ public:
     // ---- 命令面板 / 二维码 ----
     void showCommandPalette();       // Ctrl+K
     void showQrForCurrentPage();     // 当前页二维码
+
+    // ---- 稍后读 ----
+    void addToReadingList();
+    void showReadingList();
+    void saveReadingList() const;
+    void loadReadingList();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -343,6 +350,7 @@ private:
     class QTimer *m_sleepTimer = nullptr;         // 标签休眠检查定时器
     QWidget *m_dragHighlight = nullptr;           // 书签拖拽时高亮的目标
     QVector<int> m_konamiBuffer;                  // Konami 密码按键缓冲
+    QList<struct ReadingItem> m_readingList;      // 稍后读列表
     class BreezeWebPage *m_bgPage = nullptr;      // 扩展 background 隐藏页
     QUrl                m_homeUrl{"https://www.bing.com"};
 

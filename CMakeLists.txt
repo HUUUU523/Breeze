@@ -51,6 +51,8 @@ qt_add_executable(Breeze WIN32
     accountmanager.cpp
     profilemanager.h
     profilemanager.cpp
+    readinglistmanager.h
+    readinglistmanager.cpp
     profiledialog.h
     profiledialog.cpp
     accountdialog.h

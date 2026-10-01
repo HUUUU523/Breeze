@@ -108,6 +108,7 @@ BrowserWindow::BrowserWindow(QWidget *parent)
     setupDownloads();
     setupAccount();
     setupHistory();
+    loadReadingList();
 
     // 启动时恢复上次会话；若无会话则打开主页
     restoreSession();
@@ -403,6 +404,100 @@ void BrowserWindow::showFunMessage()
     };
     const int idx = QDate::currentDate().toJulianDay() % kQuotes.size();
     statusBar()->showMessage(QStringLiteral("💡 ") + kQuotes.at(idx), 8000);
+}
+
+// ===================== 稍后读 =====================
+
+void BrowserWindow::loadReadingList()
+{
+    const QString path = ProfileManager::dataDir() + QStringLiteral("/readinglist.json");
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return;
+    const QJsonArray arr = QJsonDocument::fromJson(f.readAll()).array();
+    m_readingList.clear();
+    for (const QJsonValue &v : arr) {
+        const QJsonObject o = v.toObject();
+        ReadingItem it;
+        it.title = o.value(QStringLiteral("title")).toString();
+        it.url = QUrl(o.value(QStringLiteral("url")).toString());
+        it.addedAt = QDateTime::fromString(
+            o.value(QStringLiteral("addedAt")).toString(), Qt::ISODate);
+        it.read = o.value(QStringLiteral("read")).toBool();
+        if (it.url.isValid())
+            m_readingList.append(it);
+    }
+}
+
+void BrowserWindow::saveReadingList() const
+{
+    QJsonArray arr;
+    for (const ReadingItem &it : m_readingList) {
+        QJsonObject o;
+        o.insert(QStringLiteral("title"), it.title);
+        o.insert(QStringLiteral("url"), it.url.toString());
+        o.insert(QStringLiteral("addedAt"), it.addedAt.toString(Qt::ISODate));
+        o.insert(QStringLiteral("read"), it.read);
+        arr.append(o);
+    }
+    const QString path = ProfileManager::dataDir() + QStringLiteral("/readinglist.json");
+    QFile f(path);
+    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        f.write(QJsonDocument(arr).toJson(QJsonDocument::Indented));
+}
+
+void BrowserWindow::addToReadingList()
+{
+    WebView *v = currentView();
+    if (!v || v->url().isEmpty())
+        return;
+    const QString u = v->url().toString();
+    // 去重
+    for (const ReadingItem &it : m_readingList) {
+        if (it.url.toString() == u) {
+            statusBar()->showMessage(QStringLiteral("已在稍后读列表中"), 2000);
+            return;
+        }
+    }
+    ReadingItem it;
+    it.title = v->title().isEmpty() ? v->url().host() : v->title();
+    it.url = v->url();
+    it.addedAt = QDateTime::currentDateTime();
+    it.read = false;
+    m_readingList.prepend(it);
+    saveReadingList();
+    statusBar()->showMessage(QStringLiteral("已添加到稍后读"), 2000);
+}
+
+void BrowserWindow::showReadingList()
+{
+    ReadingListDialog dlg(this);
+    dlg.setItems(m_readingList);
+    connect(&dlg, &ReadingListDialog::openUrlRequested, this,
+            [this](const QUrl &u) { createTab(u, true); });
+    connect(&dlg, &ReadingListDialog::toggleReadRequested, this,
+            [this, &dlg](const QUrl &u) {
+                for (int i = 0; i < m_readingList.size(); ++i) {
+                    if (m_readingList.at(i).url == u) {
+                        m_readingList[i].read = !m_readingList.at(i).read;
+                        break;
+                    }
+                }
+                saveReadingList();
+                dlg.setItems(m_readingList);
+            });
+    connect(&dlg, &ReadingListDialog::removeRequested, this,
+            [this, &dlg](const QUrl &u) {
+                for (int i = 0; i < m_readingList.size(); ++i) {
+                    if (m_readingList.at(i).url == u) {
+                        m_readingList.removeAt(i);
+                        break;
+                    }
+                }
+                saveReadingList();
+                dlg.setItems(m_readingList);
+            });
+    dlg.exec();
 }
 
 void BrowserWindow::showQrForCurrentPage()
@@ -874,6 +969,7 @@ void BrowserWindow::setupActions()
     QAction *actTaskMgr = mainMenu->addAction(QStringLiteral("任务管理器…"));
     QAction *actAccount = mainMenu->addAction(QStringLiteral("账号…"));
     QAction *actProfiles = mainMenu->addAction(QStringLiteral("用户…"));
+    QAction *actReading = mainMenu->addAction(QStringLiteral("稍后读…"));
     QAction *actEggs = mainMenu->addAction(QStringLiteral("🎉 彩蛋…"));
     QAction *actSync = mainMenu->addAction(QStringLiteral("云同步…"));
     mainMenu->addSeparator();
@@ -952,6 +1048,7 @@ void BrowserWindow::setupActions()
         ProfileDialog dlg(this);
         dlg.exec();
     });
+    connect(actReading, &QAction::triggered, this, &BrowserWindow::showReadingList);
     connect(actEggs, &QAction::triggered, this, [this]() {
         QMenu eggMenu(this);
         eggMenu.addAction(QStringLiteral("🌈 彩色方块雨"), this, [this]() {
