@@ -59,8 +59,10 @@
 #include <QPainter>
 #include <QTimer>
 #include <QJsonObject>
+#include <QCursor>
 #include <QMenu>
 #include <QMessageBox>
+#include <QRandomGenerator>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -721,6 +723,7 @@ void BrowserWindow::setupActions()
     QAction *actTaskMgr = mainMenu->addAction(QStringLiteral("任务管理器…"));
     QAction *actAccount = mainMenu->addAction(QStringLiteral("账号…"));
     QAction *actProfiles = mainMenu->addAction(QStringLiteral("用户…"));
+    QAction *actEggs = mainMenu->addAction(QStringLiteral("🎉 彩蛋…"));
     QAction *actSync = mainMenu->addAction(QStringLiteral("云同步…"));
     mainMenu->addSeparator();
 
@@ -797,6 +800,43 @@ void BrowserWindow::setupActions()
     connect(actProfiles, &QAction::triggered, this, [this]() {
         ProfileDialog dlg(this);
         dlg.exec();
+    });
+    connect(actEggs, &QAction::triggered, this, [this]() {
+        QMenu eggMenu(this);
+        eggMenu.addAction(QStringLiteral("🌈 彩色方块雨"), this, [this]() {
+            showEasterEgg();
+        });
+        eggMenu.addAction(QStringLiteral("💡 今日座右铭"), this, [this]() {
+            showFunMessage();
+        });
+        eggMenu.addAction(QStringLiteral("🦖 小恐龙游戏"), this, [this]() {
+            // 打开新标签页（含小恐龙）
+            WebView *v = currentView();
+            if (v)
+                v->setHtml(dialsHtml());
+            else
+                onNewTab();
+        });
+        eggMenu.addAction(QStringLiteral("🎲 随机网站"), this, [this]() {
+            static const QStringList kFun = {
+                QStringLiteral("https://neal.fun/"),
+                QStringLiteral("https://theuselessweb.com/"),
+                QStringLiteral("https://xkcd.com/"),
+                QStringLiteral("https://windows93.net/"),
+                QStringLiteral("https://puginarug.com/"),
+            };
+            const int i = QRandomGenerator::global()->bounded(kFun.size());
+            createTab(QUrl(kFun.at(i)), true);
+        });
+        eggMenu.addAction(QStringLiteral("🐱 显示 ASCII 猫"), this, [this]() {
+            const QString cat = QStringList{
+                QStringLiteral(" /\\_/\\"),
+                QStringLiteral("( o.o )"),
+                QStringLiteral(" > ^ <"),
+            }.join(QChar(10));
+            QMessageBox::information(this, QStringLiteral("喵"), cat);
+        });
+        eggMenu.exec(QCursor::pos());
     });
     connect(actTaskMgr, &QAction::triggered, this, [this]() {
         TaskManagerDialog dlg(this);
