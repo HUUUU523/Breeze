@@ -111,6 +111,7 @@ BrowserWindow::BrowserWindow(QWidget *parent)
     setupAccount();
     setupHistory();
     loadReadingList();
+    loadNotes();
 
     // 启动时恢复上次会话；若无会话则打开主页
     restoreSession();
@@ -406,6 +407,82 @@ void BrowserWindow::showFunMessage()
     };
     const int idx = QDate::currentDate().toJulianDay() % kQuotes.size();
     statusBar()->showMessage(QStringLiteral("💡 ") + kQuotes.at(idx), 8000);
+}
+
+// ===================== 网页笔记 =====================
+
+void BrowserWindow::loadNotes()
+{
+    const QString path = ProfileManager::dataDir() + QStringLiteral("/notes.json");
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return;
+    const QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
+    m_notes.clear();
+    for (auto it = o.constBegin(); it != o.constEnd(); ++it)
+        m_notes.insert(it.key(), it.value().toString());
+}
+
+void BrowserWindow::saveNotes() const
+{
+    QJsonObject o;
+    for (auto it = m_notes.constBegin(); it != m_notes.constEnd(); ++it)
+        o.insert(it.key(), it.value());
+    const QString path = ProfileManager::dataDir() + QStringLiteral("/notes.json");
+    QFile f(path);
+    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        f.write(QJsonDocument(o).toJson(QJsonDocument::Indented));
+}
+
+void BrowserWindow::showNoteForCurrentPage()
+{
+    WebView *v = currentView();
+    if (!v || v->url().isEmpty()) {
+        statusBar()->showMessage(QStringLiteral("当前没有可记笔记的页面"), 2000);
+        return;
+    }
+    const QString url = v->url().toString();
+    const QString title = v->title().isEmpty() ? v->url().host() : v->title();
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("网页笔记"));
+    dlg.resize(480, 360);
+    auto *lay = new QVBoxLayout(&dlg);
+    auto *titleLbl = new QLabel(QStringLiteral("<b>%1</b><br><span style='color:#888'>%2</span>")
+        .arg(title.toHtmlEscaped(), url.toHtmlEscaped()), &dlg);
+    titleLbl->setWordWrap(true);
+    lay->addWidget(titleLbl);
+    auto *edit = new QTextEdit(&dlg);
+    edit->setPlaceholderText(QStringLiteral("在此记录笔记…（自动关联到当前页面）"));
+    edit->setPlainText(m_notes.value(url));
+    lay->addWidget(edit);
+    auto *row = new QHBoxLayout;
+    auto *saveBtn = new QPushButton(QStringLiteral("保存"), &dlg);
+    auto *delBtn = new QPushButton(QStringLiteral("删除笔记"), &dlg);
+    auto *closeBtn = new QPushButton(QStringLiteral("关闭"), &dlg);
+    row->addWidget(saveBtn);
+    row->addWidget(delBtn);
+    row->addStretch();
+    row->addWidget(closeBtn);
+    lay->addLayout(row);
+
+    connect(saveBtn, &QPushButton::clicked, &dlg, [this, url, edit]() {
+        const QString text = edit->toPlainText();
+        if (text.trimmed().isEmpty())
+            m_notes.remove(url);
+        else
+            m_notes.insert(url, text);
+        saveNotes();
+        statusBar()->showMessage(QStringLiteral("笔记已保存"), 2000);
+    });
+    connect(delBtn, &QPushButton::clicked, &dlg, [this, url, edit]() {
+        m_notes.remove(url);
+        saveNotes();
+        edit->clear();
+        statusBar()->showMessage(QStringLiteral("笔记已删除"), 2000);
+    });
+    connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+    dlg.exec();
 }
 
 // ===================== 媒体控制 =====================
@@ -1157,6 +1234,7 @@ void BrowserWindow::setupActions()
     QAction *actAccount = mainMenu->addAction(QStringLiteral("账号…"));
     QAction *actProfiles = mainMenu->addAction(QStringLiteral("用户…"));
     QAction *actReading = mainMenu->addAction(QStringLiteral("稍后读…"));
+    QAction *actNote = mainMenu->addAction(QStringLiteral("📝 网页笔记…"));
     QAction *actMedia = mainMenu->addAction(QStringLiteral("媒体控制…"));
     QAction *actFocus = mainMenu->addAction(QStringLiteral("🍅 专注模式…"));
     QAction *actFocusStop = mainMenu->addAction(QStringLiteral("停止专注"));
@@ -1239,6 +1317,7 @@ void BrowserWindow::setupActions()
         dlg.exec();
     });
     connect(actReading, &QAction::triggered, this, &BrowserWindow::showReadingList);
+    connect(actNote, &QAction::triggered, this, &BrowserWindow::showNoteForCurrentPage);
     connect(actMedia, &QAction::triggered, this, &BrowserWindow::showMediaControl);
     connect(actFocus, &QAction::triggered, this, &BrowserWindow::startFocusMode);
     connect(actFocusStop, &QAction::triggered, this, &BrowserWindow::stopFocusMode);

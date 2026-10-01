@@ -151,6 +151,11 @@ public:
     // ---- 媒体控制 ----
     void showMediaControl();
 
+    // ---- 网页笔记 ----
+    void showNoteForCurrentPage();
+    void saveNotes() const;
+    void loadNotes();
+
     // ---- 朗读 ----
     void speakText(const QString &text);     // 用系统 TTS 朗读
     void speakSelectionOrPage();             // 朗读选中文字或整页正文
@@ -367,6 +372,7 @@ private:
     class QTimer *m_focusTimer = nullptr;         // 专注模式计时器
     int m_focusRemaining = 0;                     // 剩余秒数
     class WebView *m_lastActiveView = nullptr;    // 上一个活动的标签（用于保存滚动位置）
+    QHash<QString, QString> m_notes;              // URL → 笔记内容
     class BreezeWebPage *m_bgPage = nullptr;      // 扩展 background 隐藏页
     QUrl                m_homeUrl{"https://www.bing.com"};
 
