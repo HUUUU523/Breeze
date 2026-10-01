@@ -17,7 +17,14 @@
 #include <QWebEngineHistory>
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
+#include <QDialog>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QListWidget>
 #include <QMessageBox>
+#include <QPushButton>
+#include <QVBoxLayout>
 
 // ===================== BreezeWebPage =====================
 
@@ -428,6 +435,56 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
                     "var t=document.createTextNode(m.textContent);"
                     "m.parentNode.replaceChild(t,m);});"
                     "})();"));
+            });
+            menu.addAction(QStringLiteral("📑 网页大纲（TOC）"), this, [this]() {
+                page()->runJavaScript(QStringLiteral(
+                    "(function(){"
+                    "var hs=document.querySelectorAll('h1,h2,h3,h4');"
+                    "var out=[];"
+                    "for(var i=0;i<hs.length;i++){"
+                    "var h=hs[i];"
+                    "if(!h.id)h.id='__breeze_h_'+i;"
+                    "out.push({level:parseInt(h.tagName.substring(1)),"
+                    "text:(h.innerText||'').trim(),id:h.id});}"
+                    "return JSON.stringify(out);})();"),
+                    [this](const QVariant &r) {
+                        const QJsonArray arr = QJsonDocument::fromJson(
+                            r.toString().toUtf8()).array();
+                        if (arr.isEmpty()) {
+                            QMessageBox::information(nullptr, QStringLiteral("网页大纲"),
+                                                     QStringLiteral("页面没有标题结构。"));
+                            return;
+                        }
+                        QDialog dlg;
+                        dlg.setWindowTitle(QStringLiteral("网页大纲"));
+                        dlg.resize(400, 500);
+                        auto *lay = new QVBoxLayout(&dlg);
+                        auto *list = new QListWidget(&dlg);
+                        for (const QJsonValue &v : arr) {
+                            const QJsonObject o = v.toObject();
+                            const int lv = o.value(QStringLiteral("level")).toInt();
+                            const QString text = o.value(QStringLiteral("text")).toString();
+                            if (text.isEmpty())
+                                continue;
+                            auto *it = new QListWidgetItem(
+                                QString(lv - 1, QLatin1Char(' '))
+                                + (lv == 1 ? QStringLiteral("▸ ") : QStringLiteral("· "))
+                                + text, list);
+                            it->setData(Qt::UserRole, o.value(QStringLiteral("id")).toString());
+                        }
+                        lay->addWidget(list);
+                        auto *closeBtn = new QPushButton(QStringLiteral("关闭"), &dlg);
+                        lay->addWidget(closeBtn);
+                        connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+                        connect(list, &QListWidget::itemClicked, &dlg,
+                                [this, &dlg](QListWidgetItem *it) {
+                                    const QString id = it->data(Qt::UserRole).toString();
+                                    page()->runJavaScript(QStringLiteral(
+                                        "document.getElementById('%1').scrollIntoView("
+                                        "{behavior:'smooth',block:'start'});").arg(id));
+                                });
+                        dlg.exec();
+                    });
             });
             menu.addAction(QStringLiteral("📺 画中画"), this, [this]() {
                 page()->runJavaScript(QStringLiteral(
