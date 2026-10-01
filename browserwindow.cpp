@@ -34,6 +34,7 @@
 #include <QKeySequence>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QProcess>
 #include <QShortcut>
 #include <QTextEdit>
 #include <QApplication>
@@ -407,6 +408,54 @@ void BrowserWindow::showFunMessage()
     statusBar()->showMessage(QStringLiteral("💡 ") + kQuotes.at(idx), 8000);
 }
 
+// ===================== 朗读 =====================
+
+void BrowserWindow::speakText(const QString &text)
+{
+    const QString t = text.trimmed();
+    if (t.isEmpty())
+        return;
+    if (t.length() > 5000) {
+        statusBar()->showMessage(QStringLiteral("文本过长（%1 字），只朗读前 5000 字")
+                                     .arg(t.length()), 3000);
+    }
+    const QString clipped = t.left(5000);
+    // base64 编码，避免命令行/编码问题
+    const QByteArray b64 = clipped.toUtf8().toBase64();
+    const QString script = QStringLiteral(
+        "Add-Type -AssemblyName System.Speech;"
+        "$b=[System.Convert]::FromBase64String('%1');"
+        "$s=[System.Text.Encoding]::UTF8.GetString($b);"
+        "$sp=New-Object System.Speech.Synthesis.SpeechSynthesizer;"
+        "$sp.Speak($s);").arg(QString::fromLatin1(b64));
+
+    auto *proc = new QProcess(this);
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            proc, &QProcess::deleteLater);
+    proc->start(QStringLiteral("powershell"),
+                { QStringLiteral("-NoProfile"),
+                  QStringLiteral("-Command"), script });
+    statusBar()->showMessage(QStringLiteral("🔊 正在朗读…"), 3000);
+}
+
+void BrowserWindow::speakSelectionOrPage()
+{
+    WebView *v = currentView();
+    if (!v)
+        return;
+    v->page()->runJavaScript(QStringLiteral(
+        "(function(){var s=window.getSelection().toString().trim();"
+        "if(s)return s;"
+        "var c=document.querySelectorAll('article,main,[class*=content],[id*=content]');"
+        "var b='',l=0;for(var i=0;i<c.length;i++){var t=c[i].innerText||'';"
+        "if(t.length>l){l=t.length;b=t;}}"
+        "if(!l||l<100)b=document.body.innerText;"
+        "return b;})();"),
+        [this](const QVariant &r) {
+            speakText(r.toString());
+        });
+}
+
 // ===================== 专注模式 =====================
 
 void BrowserWindow::startFocusMode()
@@ -634,6 +683,7 @@ void BrowserWindow::showCommandPalette()
                 "color:#333;overflow:auto;padding:60px 20vw;font:18px/1.8 Georgia,serif;"
                 "white-space:pre-wrap;';d.textContent=b;document.body.appendChild(d);})();")); } },
         { QStringLiteral("当前页二维码"), QStringLiteral("qr code erweima"), [this]() { showQrForCurrentPage(); } },
+        { QStringLiteral("朗读选中/整页"), QStringLiteral("speak tts langsong"), [this]() { speakSelectionOrPage(); } },
         { QStringLiteral("截图当前页"), QStringLiteral("screenshot jietu"), [this]() { capturePage(); } },
         { QStringLiteral("整页截图"), QStringLiteral("fullpage screenshot"), [this]() { captureFullPage(); } },
         { QStringLiteral("打印"), QStringLiteral("print dayin"), [this]() { printPage(); } },
@@ -2658,6 +2708,27 @@ void BrowserWindow::onTabBarContextMenu(const QPoint &pos)
                 setTabAutoRefresh(view, sec);
             });
         }
+
+        // 标签颜色标记
+        QMenu *colorMenu = menu.addMenu(QStringLiteral("标签颜色"));
+        struct ColorChoice { QString name; QString color; };
+        const QList<ColorChoice> colors = {
+            { QStringLiteral("无"),   QString() },
+            { QStringLiteral("红"),   QStringLiteral("#e74c3c") },
+            { QStringLiteral("橙"),   QStringLiteral("#e67e22") },
+            { QStringLiteral("黄"),   QStringLiteral("#f1c40f") },
+            { QStringLiteral("绿"),   QStringLiteral("#2ecc71") },
+            { QStringLiteral("蓝"),   QStringLiteral("#3498db") },
+            { QStringLiteral("紫"),   QStringLiteral("#9b59b6") },
+            { QStringLiteral("灰"),   QStringLiteral("#95a5a6") },
+        };
+        for (const ColorChoice &c : colors) {
+            QAction *a = colorMenu->addAction(c.name);
+            const QString col = c.color;
+            connect(a, &QAction::triggered, this, [this, index, col]() {
+                setTabColor(index, col);
+            });
+        }
     }
     if (view) {
         QAction *actCopyUrl = menu.addAction(QStringLiteral("复制标签地址"));
@@ -2806,6 +2877,22 @@ void BrowserWindow::showTabSwitcher()
     const int ret = dlg.exec();
     if (ret > 0)
         m_tabs->setCurrentIndex(ret - 1);
+}
+
+void BrowserWindow::setTabColor(int index, const QString &color)
+{
+    if (index < 0 || index >= m_tabs->count())
+        return;
+    auto *view = qobject_cast<WebView *>(m_tabs->widget(index));
+    if (color.isEmpty()) {
+        m_tabs->tabBar()->setTabTextColor(index, QColor());
+        if (view)
+            view->setProperty("breezeTabColor", QString());
+    } else {
+        m_tabs->tabBar()->setTabTextColor(index, QColor(color));
+        if (view)
+            view->setProperty("breezeTabColor", color);
+    }
 }
 
 void BrowserWindow::onTabChanged(int index)

@@ -148,6 +148,10 @@ public:
     void saveReadingList() const;
     void loadReadingList();
 
+    // ---- 朗读 ----
+    void speakText(const QString &text);     // 用系统 TTS 朗读
+    void speakSelectionOrPage();             // 朗读选中文字或整页正文
+
     // ---- 专注模式（番茄钟） ----
     void startFocusMode();       // 弹出设置时长并开始
     void stopFocusMode();
@@ -166,6 +170,7 @@ private slots:
     void onTabChanged(int index);
     void onReopenClosedTab();              // Ctrl+Shift+T
     void onTabBarContextMenu(const QPoint &pos);  // 右键标签：静音等
+    void setTabColor(int index, const QString &color);  // 设置标签颜色标记
     void showTabSwitcher();                // Ctrl+Shift+A 标签搜索
     void showBlockedDetails();             // 盾牌点击：查看已拦截列表
     void togglePinTab(int index);          // 固定/取消固定标签
