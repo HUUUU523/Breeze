@@ -2,8 +2,11 @@
 #include "browserwindow.h"
 #include "syncmanager.h"
 
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -21,6 +24,31 @@ SyncDialog::SyncDialog(BrowserWindow *browser)
     resize(520, 340);
 
     auto *layout = new QVBoxLayout(this);
+
+    // ===== 快速登录 =====
+    auto *quickBox = new QGroupBox(QStringLiteral("快速登录"), this);
+    auto *quickForm = new QFormLayout(quickBox);
+    m_providerCombo = new QComboBox(quickBox);
+    m_providerCombo->addItem(QStringLiteral("坚果云"), QStringLiteral("jianguoyun"));
+    m_providerCombo->addItem(QStringLiteral("NextCloud"), QStringLiteral("nextcloud"));
+    m_providerCombo->addItem(QStringLiteral("自定义"), QStringLiteral("custom"));
+
+    m_quickAccount = new QLineEdit(quickBox);
+    m_quickAccount->setPlaceholderText(QStringLiteral("坚果云/NextCloud 登录邮箱"));
+    m_quickPassword = new QLineEdit(quickBox);
+    m_quickPassword->setEchoMode(QLineEdit::Password);
+    m_quickPassword->setPlaceholderText(
+        QStringLiteral("应用密码（非登录密码，需在服务商网页端生成）"));
+
+    quickForm->addRow(QStringLiteral("服务商："), m_providerCombo);
+    quickForm->addRow(QStringLiteral("账号："), m_quickAccount);
+    quickForm->addRow(QStringLiteral("应用密码："), m_quickPassword);
+
+    m_loginBtn = new QPushButton(QStringLiteral("登录并填入"), quickBox);
+    quickForm->addRow(QString(), m_loginBtn);
+    layout->addWidget(quickBox);
+
+    // ===== 手动配置 =====
     auto *form = new QFormLayout;
 
     m_urlEdit = new QLineEdit(this);
@@ -53,8 +81,69 @@ SyncDialog::SyncDialog(BrowserWindow *browser)
     connect(upBtn, &QPushButton::clicked, this, &SyncDialog::onUpload);
     connect(downBtn, &QPushButton::clicked, this, &SyncDialog::onDownload);
     connect(btns, &QDialogButtonBox::rejected, this, &QDialog::accept);
+    connect(m_loginBtn, &QPushButton::clicked, this, &SyncDialog::onQuickLogin);
+    connect(m_providerCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &SyncDialog::onProviderChanged);
 
+    onProviderChanged();
     loadConfig();
+}
+
+void SyncDialog::onProviderChanged()
+{
+    const QString id = m_providerCombo->currentData().toString();
+    if (id == QStringLiteral("jianguoyun")) {
+        m_quickAccount->setPlaceholderText(QStringLiteral("坚果云登录邮箱"));
+        m_quickPassword->setEnabled(true);
+        m_urlEdit->setPlaceholderText(QStringLiteral("https://dav.jianguoyun.com/dav/"));
+    } else if (id == QStringLiteral("nextcloud")) {
+        m_quickAccount->setPlaceholderText(QStringLiteral("NextCloud 用户名"));
+        m_quickPassword->setEnabled(true);
+        m_urlEdit->setPlaceholderText(
+            QStringLiteral("https://your-server/remote.php/dav/files/用户名/"));
+    } else {
+        m_quickAccount->setPlaceholderText(QStringLiteral("（自定义请直接填下方手动配置）"));
+        m_urlEdit->setPlaceholderText(QStringLiteral("https://example.com/dav/"));
+    }
+}
+
+void SyncDialog::onQuickLogin()
+{
+    const QString id = m_providerCombo->currentData().toString();
+    const QString account = m_quickAccount->text().trimmed();
+    const QString pass = m_quickPassword->text();
+
+    if (id == QStringLiteral("custom")) {
+        QMessageBox::information(this, QStringLiteral("快速登录"),
+            QStringLiteral("「自定义」请直接在下方手动填写服务器、用户名和密码。"));
+        return;
+    }
+    if (account.isEmpty() || pass.isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("快速登录"),
+            QStringLiteral("请填写账号和应用密码。"));
+        return;
+    }
+
+    // 按服务商拼接 WebDAV 地址并回填
+    QString url;
+    if (id == QStringLiteral("jianguoyun")) {
+        url = QStringLiteral("https://dav.jianguoyun.com/dav/");
+    } else if (id == QStringLiteral("nextcloud")) {
+        // NextCloud 的账号本身就是用户目录名
+        url = QStringLiteral("https://%1/remote.php/dav/files/%2/")
+                  .arg(account.contains(QLatin1Char('@'))
+                           ? account.section(QLatin1Char('@'), 1)
+                           : account,
+                       account.section(QLatin1Char('@'), 0, 0));
+    }
+
+    m_urlEdit->setText(url);
+    m_userEdit->setText(account);
+    m_passEdit->setText(pass);
+    saveConfig();
+
+    QMessageBox::information(this, QStringLiteral("快速登录"),
+        QStringLiteral("已填入配置，点「上传」或「下载」即可开始同步。"));
 }
 
 void SyncDialog::loadConfig()
