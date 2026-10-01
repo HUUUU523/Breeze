@@ -147,6 +147,7 @@ public:
     void showReadingList();
     void saveReadingList() const;
     void loadReadingList();
+    void exportReadingList();   // 导出为 HTML
 
     // ---- 媒体控制 ----
     void showMediaControl();

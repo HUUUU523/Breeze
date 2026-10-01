@@ -1039,6 +1039,49 @@ void BrowserWindow::showReadingList()
     dlg.exec();
 }
 
+void BrowserWindow::exportReadingList()
+{
+    if (m_readingList.isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("导出稍后读"),
+                                 QStringLiteral("稍后读列表为空。"));
+        return;
+    }
+    const QString path = QFileDialog::getSaveFileName(
+        this, QStringLiteral("导出稍后读"),
+        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+            + QStringLiteral("/breeze-reading-list.html"),
+        QStringLiteral("HTML 文件 (*.html)"));
+    if (path.isEmpty())
+        return;
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, QStringLiteral("导出失败"),
+                             QStringLiteral("无法写入文件。"));
+        return;
+    }
+    QTextStream ts(&f);
+    ts.setEncoding(QStringConverter::Utf8);
+    ts << QStringLiteral(R"HTML(<!DOCTYPE html><html><head><meta charset="utf-8">)HTML");
+    ts << QStringLiteral(R"HTML(<title>稍后读 - Breeze</title>)HTML");
+    ts << QStringLiteral(R"HTML(<style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;})HTML");
+    ts << QStringLiteral(R"HTML(h1{color:#3a6ea5;}li{margin:10px 0;})HTML");
+    ts << QStringLiteral(R"HTML(.read{color:#999;text-decoration:line-through;})HTML");
+    ts << QStringLiteral(R"HTML(.date{color:#aaa;font-size:12px;margin-left:8px;}</style></head><body>)HTML");
+    ts << QStringLiteral(R"HTML(<h1>📚 稍后读</h1><ul>)HTML") << QChar(10);
+    for (const ReadingItem &it : m_readingList) {
+        const QString title = it.title.isEmpty() ? it.url.host() : it.title;
+        const QString cls = it.read ? QStringLiteral("read") : QString();
+        ts << QStringLiteral("<li><a class=\"%1\" href=\"%2\">%3</a>")
+                  .arg(cls, it.url.toString().toHtmlEscaped(), title.toHtmlEscaped());
+        ts << QStringLiteral("<span class=\"date\">%1</span></li>")
+                  .arg(it.addedAt.toString(QStringLiteral("yyyy-MM-dd"))) << QChar(10);
+    }
+    ts << QStringLiteral(R"HTML(</ul></body></html>)HTML");
+    f.close();
+    QMessageBox::information(this, QStringLiteral("导出完成"),
+        QStringLiteral("已导出 %1 条稍后读。").arg(m_readingList.size()));
+}
+
 void BrowserWindow::showQrForCurrentPage()
 {
     WebView *v = currentView();
@@ -1606,6 +1649,11 @@ void BrowserWindow::setupActions()
         dlg.exec();
     });
     connect(actReading, &QAction::triggered, this, &BrowserWindow::showReadingList);
+    {
+        QAction *aExport = new QAction(QStringLiteral("导出稍后读…"), this);
+        connect(aExport, &QAction::triggered, this, &BrowserWindow::exportReadingList);
+        mainMenu->addAction(aExport);
+    }
     connect(actNote, &QAction::triggered, this, &BrowserWindow::showNoteForCurrentPage);
     connect(actClip, &QAction::triggered, this, &BrowserWindow::showClipboardHistory);
     connect(actMedia, &QAction::triggered, this, &BrowserWindow::showMediaControl);
