@@ -117,6 +117,45 @@ void SyncManager::upload(const QByteArray &plainData)
     });
 }
 
+void SyncManager::testConnection()
+{
+    if (m_baseUrl.isEmpty()) {
+        emit testFinished(false, QStringLiteral("未填写服务器地址"));
+        return;
+    }
+
+    // 对根目录发 PROPFIND（Depth: 0），WebDAV 服务应返回 207 Multi-Status
+    QNetworkRequest req{QUrl(m_baseUrl)};
+    req.setRawHeader("Depth", "0");
+    req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/xml"));
+    if (!m_user.isEmpty())
+        req.setRawHeader("Authorization",
+            "Basic " + (m_user + QLatin1Char(':') + m_password).toUtf8().toBase64());
+
+    emit progress(QStringLiteral("正在测试连接…"));
+    const QChar q(34);   // 双引号
+    const QByteArray body = QStringLiteral(
+        "<?xml version=%11.0%1?>"
+        "<d:propfind xmlns:d=%1DAV:%1><d:prop><d:resourcetype/></d:prop></d:propfind>")
+        .arg(q).toUtf8();
+    QNetworkReply *reply = m_net->sendCustomRequest(req, "PROPFIND", body);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        const int http = reply->attribute(
+            QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit testFinished(false, reply->errorString());
+            return;
+        }
+        if (http == 207 || http == 200) {
+            emit testFinished(true, QStringLiteral("连接成功（HTTP %1）").arg(http));
+        } else {
+            emit testFinished(false,
+                QStringLiteral("服务器返回 HTTP %1").arg(http));
+        }
+    });
+}
+
 void SyncManager::download()
 {
     if (m_baseUrl.isEmpty() || m_remotePath.isEmpty()) {

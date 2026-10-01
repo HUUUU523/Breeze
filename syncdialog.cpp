@@ -2,6 +2,7 @@
 #include "browserwindow.h"
 #include "syncmanager.h"
 
+#include <QCryptographicHash>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -140,10 +141,35 @@ void SyncDialog::onQuickLogin()
     m_urlEdit->setText(url);
     m_userEdit->setText(account);
     m_passEdit->setText(pass);
+    // 加密口令留空时，用"账号+服务商"派生一个稳定口令，保证多设备一致
+    if (m_passphraseEdit->text().isEmpty()) {
+        const QByteArray seed = (id + QLatin1Char(':') + account).toUtf8();
+        m_passphraseEdit->setText(QString::fromLatin1(
+            QCryptographicHash::hash(seed, QCryptographicHash::Sha256).toHex().left(32)));
+    }
     saveConfig();
 
-    QMessageBox::information(this, QStringLiteral("快速登录"),
-        QStringLiteral("已填入配置，点「上传」或「下载」即可开始同步。"));
+    // 实时验证连接
+    m_loginBtn->setEnabled(false);
+    m_loginBtn->setText(QStringLiteral("正在验证…"));
+    auto *mgr = new SyncManager(this);
+    mgr->setServer(url, account, pass);
+    mgr->setRemotePath(m_pathEdit->text().trimmed());
+    connect(mgr, &SyncManager::testFinished, this,
+            [this, mgr](bool ok, const QString &msg) {
+                mgr->deleteLater();
+                m_loginBtn->setEnabled(true);
+                m_loginBtn->setText(QStringLiteral("登录并填入"));
+                if (ok)
+                    QMessageBox::information(this, QStringLiteral("快速登录"),
+                        QStringLiteral("登录成功，已填入配置。点「上传」或「下载」开始同步。"));
+                else
+                    QMessageBox::warning(this, QStringLiteral("快速登录"),
+                        QStringLiteral("连接失败：") + msg
+                        + QString(2, QChar(10))
+                        + QStringLiteral("请检查账号/应用密码是否正确。"));
+            });
+    mgr->testConnection();
 }
 
 void SyncDialog::loadConfig()

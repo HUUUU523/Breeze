@@ -25,9 +25,13 @@ public:
     void upload(const QByteArray &plainData);
     void download();
 
+    // 连通性/认证测试（PROPFIND 根目录）
+    void testConnection();
+
 signals:
     void uploadFinished(bool ok, const QString &message);
     void downloadFinished(bool ok, const QByteArray &data, const QString &message);
+    void testFinished(bool ok, const QString &message);
     void progress(const QString &text);
 
 private:
