@@ -17,6 +17,7 @@
 #include "settingsdialog.h"
 #include "syncmerge.h"
 #include "syncdialog.h"
+#include "qrcodegen.h"
 #include "toolbox.h"
 #include "taskmanagerdialog.h"
 #include "translator.h"
@@ -317,6 +318,14 @@ void BrowserWindow::notifyPreviousCrash()
 
 void BrowserWindow::keyPressEvent(QKeyEvent *event)
 {
+    // 命令面板：Ctrl+K
+    if (event->key() == Qt::Key_K
+        && (event->modifiers() & Qt::ControlModifier)
+        && !(event->modifiers() & Qt::ShiftModifier)) {
+        showCommandPalette();
+        return;
+    }
+
     // 彩蛋 1：Konami 密码（↑↑↓↓←→←→ B A）
     m_konamiBuffer.append(event->key());
     if (m_konamiBuffer.size() > 10)
@@ -394,6 +403,148 @@ void BrowserWindow::showFunMessage()
     };
     const int idx = QDate::currentDate().toJulianDay() % kQuotes.size();
     statusBar()->showMessage(QStringLiteral("💡 ") + kQuotes.at(idx), 8000);
+}
+
+void BrowserWindow::showQrForCurrentPage()
+{
+    WebView *v = currentView();
+    if (!v || v->url().isEmpty())
+        return;
+    const QString text = v->url().toString();
+
+    using namespace qrcodegen;
+    const QrCode qr = QrCode::encodeText(text.toUtf8().constData(), QrCode::Ecc::MEDIUM);
+    const int n = qr.getSize();
+    const int scale = 6;
+    const int margin = scale * 2;
+    const int total = n * scale + margin * 2;
+    QPixmap pix(total, total);
+    pix.fill(Qt::white);
+    {
+        QPainter p(&pix);
+        p.setPen(Qt::NoPen);
+        p.setBrush(Qt::black);
+        for (int y = 0; y < n; ++y)
+            for (int x = 0; x < n; ++x)
+                if (qr.getModule(x, y))
+                    p.drawRect(margin + x * scale, margin + y * scale, scale, scale);
+    }
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("页面二维码"));
+    auto *lay = new QVBoxLayout(&dlg);
+    auto *lbl = new QLabel(&dlg);
+    lbl->setPixmap(pix);
+    lbl->setAlignment(Qt::AlignCenter);
+    lay->addWidget(lbl);
+    auto *urlLbl = new QLabel(text, &dlg);
+    urlLbl->setWordWrap(true);
+    urlLbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    lay->addWidget(urlLbl);
+    auto *copyBtn = new QPushButton(QStringLiteral("复制链接"), &dlg);
+    lay->addWidget(copyBtn);
+    connect(copyBtn, &QPushButton::clicked, this, [text]() {
+        QApplication::clipboard()->setText(text);
+    });
+    dlg.exec();
+}
+
+void BrowserWindow::showCommandPalette()
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("命令面板"));
+    dlg.resize(480, 360);
+    auto *lay = new QVBoxLayout(&dlg);
+    auto *input = new QLineEdit(&dlg);
+    input->setPlaceholderText(QStringLiteral("输入命令…（如：新标签、书签、下载、设置）"));
+    lay->addWidget(input);
+    auto *list = new QListWidget(&dlg);
+    lay->addWidget(list);
+
+    // 命令表：{名称, 关键词, 动作}
+    struct Cmd { QString name; QString key; std::function<void()> fn; };
+    const QList<Cmd> cmds = {
+        { QStringLiteral("新建标签页"), QStringLiteral("new tab xinjiantab"), [this]() { onNewTab(); } },
+        { QStringLiteral("新建隐私标签"), QStringLiteral("private yinsi"), [this]() { onNewPrivateTab(); } },
+        { QStringLiteral("关闭当前标签"), QStringLiteral("close tab guanbi"), [this]() {
+            onCloseTab(m_tabs->currentIndex()); } },
+        { QStringLiteral("重新打开关闭的标签"), QStringLiteral("reopen chongkai"), [this]() { onReopenClosedTab(); } },
+        { QStringLiteral("刷新"), QStringLiteral("reload refresh shuaxin"), [this]() { navReload(); } },
+        { QStringLiteral("显示书签栏"), QStringLiteral("bookmark bar shuqian"), [this]() {
+            if (m_bookmarkBar) m_bookmarkBar->setVisible(!m_bookmarkBar->isVisible()); } },
+        { QStringLiteral("书签管理器"), QStringLiteral("bookmark manager shuqian"), [this]() { showBookmarkManager(); } },
+        { QStringLiteral("历史记录"), QStringLiteral("history lishi"), [this]() { showHistory(); } },
+        { QStringLiteral("下载管理"), QStringLiteral("download xiazai"), [this]() { showDownloads(); } },
+        { QStringLiteral("设置"), QStringLiteral("settings shezhi"), [this]() { showSettings(); } },
+        { QStringLiteral("AI 侧边栏"), QStringLiteral("ai sidebar"), [this]() { toggleAiSidebar(); } },
+        { QStringLiteral("网页翻译"), QStringLiteral("translate fanyi"), [this]() { aiTranslatePage(); } },
+        { QStringLiteral("阅读模式"), QStringLiteral("reader yuedu"), [this]() {
+            WebView *v = currentView();
+            if (v) v->page()->runJavaScript(QStringLiteral(
+                "(function(){if(document.getElementById('__breeze_reader__'))"
+                "{document.getElementById('__breeze_reader__').remove();return;}"
+                "var c=document.querySelectorAll('article,main,[class*=content],[id*=content]');"
+                "var b='',l=0;for(var i=0;i<c.length;i++){var t=c[i].innerText||'';"
+                "if(t.length>l){l=t.length;b=t;}}if(!l||l<200)b=document.body.innerText;"
+                "var d=document.createElement('div');d.id='__breeze_reader__';"
+                "d.style.cssText='position:fixed;inset:0;z-index:2147483646;background:#faf8f5;"
+                "color:#333;overflow:auto;padding:60px 20vw;font:18px/1.8 Georgia,serif;"
+                "white-space:pre-wrap;';d.textContent=b;document.body.appendChild(d);})();")); } },
+        { QStringLiteral("当前页二维码"), QStringLiteral("qr code erweima"), [this]() { showQrForCurrentPage(); } },
+        { QStringLiteral("截图当前页"), QStringLiteral("screenshot jietu"), [this]() { capturePage(); } },
+        { QStringLiteral("整页截图"), QStringLiteral("fullpage screenshot"), [this]() { captureFullPage(); } },
+        { QStringLiteral("打印"), QStringLiteral("print dayin"), [this]() { printPage(); } },
+        { QStringLiteral("保存为 PDF"), QStringLiteral("pdf"), [this]() { savePageAsPdf(); } },
+        { QStringLiteral("工具箱"), QStringLiteral("toolbox gongjuxiang"), [this]() { showToolbox(); } },
+        { QStringLiteral("用户管理"), QStringLiteral("profile yonghu"), [this]() {
+            ProfileDialog d(this); d.exec(); } },
+        { QStringLiteral("任务管理器"), QStringLiteral("task manager renwu"), [this]() {
+            TaskManagerDialog d(this);
+            QList<WebView *> tabs;
+            for (int i = 0; i < m_tabs->count(); ++i)
+                if (auto *vv = qobject_cast<WebView *>(m_tabs->widget(i)))
+                    tabs.append(vv);
+            d.setTabs(tabs); d.exec(); } },
+        { QStringLiteral("清除浏览数据"), QStringLiteral("clear data qingchu"), [this]() { clearBrowsingData(); } },
+        { QStringLiteral("🎉 彩蛋"), QStringLiteral("easter egg caidan"), [this]() { showEasterEgg(); } },
+    };
+
+    auto fill = [&](const QString &filter) {
+        list->clear();
+        const QString f = filter.trimmed().toLower();
+        for (const Cmd &c : cmds) {
+            if (!f.isEmpty()
+                && !c.name.toLower().contains(f)
+                && !c.key.contains(f))
+                continue;
+            auto *item = new QListWidgetItem(c.name, list);
+            item->setData(Qt::UserRole, int(&c - cmds.constData()));
+        }
+    };
+    fill(QString());
+
+    connect(input, &QLineEdit::textChanged, this, [&](const QString &t) { fill(t); });
+    connect(input, &QLineEdit::returnPressed, this, [&]() {
+        auto *it = list->currentItem();
+        if (!it) return;
+        const int idx = it->data(Qt::UserRole).toInt();
+        if (idx >= 0 && idx < cmds.size()) {
+            auto fn = cmds.at(idx).fn;
+            dlg.accept();
+            fn();
+        }
+    });
+    connect(list, &QListWidget::itemActivated, this, [&](QListWidgetItem *it) {
+        const int idx = it->data(Qt::UserRole).toInt();
+        if (idx >= 0 && idx < cmds.size()) {
+            auto fn = cmds.at(idx).fn;
+            dlg.accept();
+            fn();
+        }
+    });
+
+    input->setFocus();
+    dlg.exec();
 }
 
 void BrowserWindow::closeEvent(QCloseEvent *event)
@@ -2095,6 +2246,36 @@ WebView *BrowserWindow::createTabView(bool privateMode)
             statusBar()->clearMessage();
         else
             statusBar()->showMessage(u);
+    });
+
+    // 鼠标手势
+    connect(view, &WebView::gestureTriggered, this, [this, view](const QString &g) {
+        if (g == QStringLiteral("L")) {
+            // ← 后退
+            if (view->history()->canGoBack())
+                view->back();
+            else
+                statusBar()->showMessage(QStringLiteral("手势：后退（无历史）"), 1500);
+        } else if (g == QStringLiteral("R")) {
+            if (view->history()->canGoForward())
+                view->forward();
+            else
+                statusBar()->showMessage(QStringLiteral("手势：前进（无历史）"), 1500);
+        } else if (g == QStringLiteral("U")) {
+            view->reload();
+            statusBar()->showMessage(QStringLiteral("手势：刷新"), 1500);
+        } else if (g == QStringLiteral("D")) {
+            onCloseTab(m_tabs->indexOf(view));
+        } else if (g == QStringLiteral("DR")) {
+            onCloseTab(m_tabs->indexOf(view));
+        } else if (g == QStringLiteral("UD")) {
+            view->reload();
+        } else if (g == QStringLiteral("RL")) {
+            onNewTab();
+        } else {
+            statusBar()->showMessage(
+                QStringLiteral("手势：%1（未绑定）").arg(g), 1500);
+        }
     });
 
     // 扩展 tabs 命令：remove / reload

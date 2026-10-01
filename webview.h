@@ -82,11 +82,18 @@ signals:
     void extMessage(const QString &json);
     // 扩展 tabs 命令（chrome.tabs.remove/reload 等）
     void tabsCommand(const QString &json);
+    // 鼠标手势：轨迹方向串（如 "LR" 表示先左后右）
+    void gestureTriggered(const QString &gesture);
+    // 手势进行中的实时轨迹（用于绘制提示）
+    void gestureProgress(const QPoint &pos);
 
 
 protected:
     QWebEngineView *createWindow(QWebEnginePage::WebWindowType type) override;
     void contextMenuEvent(QContextMenuEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
 
 private slots:
     void onCertificateError(const QWebEngineCertificateError &error);
@@ -96,6 +103,12 @@ private:
 
     std::function<WebView *(bool background)> m_newTabProvider;
     bool m_selectionToolbarEnabled = true;
+
+    // 鼠标手势状态
+    bool m_gestureActive = false;
+    QPoint m_gestureStart;
+    QPoint m_gestureLast;
+    QString m_gestureDirs;
 };
 
 #endif // WEBVIEW_H

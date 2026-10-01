@@ -238,6 +238,62 @@ QWebEngineView *WebView::createWindow(QWebEnginePage::WebWindowType type)
     return m_newTabProvider(background);
 }
 
+// ===================== 鼠标手势 =====================
+
+void WebView::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::RightButton) {
+        m_gestureActive = true;
+        m_gestureStart = event->pos();
+        m_gestureLast = event->pos();
+        m_gestureDirs.clear();
+        event->accept();
+        return;
+    }
+    QWebEngineView::mousePressEvent(event);
+}
+
+void WebView::mouseMoveEvent(QMouseEvent *event)
+{
+    if (m_gestureActive) {
+        const QPoint delta = event->pos() - m_gestureLast;
+        constexpr int kThreshold = 30;   // 移动多少像素算一个方向
+        if (delta.manhattanLength() >= kThreshold) {
+            QString dir;
+            if (qAbs(delta.x()) > qAbs(delta.y()))
+                dir = delta.x() > 0 ? QStringLiteral("R") : QStringLiteral("L");
+            else
+                dir = delta.y() > 0 ? QStringLiteral("D") : QStringLiteral("U");
+            if (m_gestureDirs.right(1) != dir)
+                m_gestureDirs += dir;
+            m_gestureLast = event->pos();
+        }
+        emit gestureProgress(event->pos());
+        event->accept();
+        return;
+    }
+    QWebEngineView::mouseMoveEvent(event);
+}
+
+void WebView::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::RightButton && m_gestureActive) {
+        m_gestureActive = false;
+        const int moved = (event->pos() - m_gestureStart).manhattanLength();
+        if (moved < 20) {
+            // 没怎么动：视为普通右键菜单
+            QContextMenuEvent ce(QContextMenuEvent::Mouse, event->pos(),
+                                 mapToGlobal(event->pos()));
+            contextMenuEvent(&ce);
+        } else if (!m_gestureDirs.isEmpty()) {
+            emit gestureTriggered(m_gestureDirs);
+        }
+        event->accept();
+        return;
+    }
+    QWebEngineView::mouseReleaseEvent(event);
+}
+
 void WebView::contextMenuEvent(QContextMenuEvent *event)
 {
     // 记录本次右键的上下文（图片/链接地址）

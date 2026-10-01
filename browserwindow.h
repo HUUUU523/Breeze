@@ -137,6 +137,10 @@ public:
     void showEasterEgg();            // 主彩蛋（方块雨）
     void showFunMessage();           // 每日随机座右铭
 
+    // ---- 命令面板 / 二维码 ----
+    void showCommandPalette();       // Ctrl+K
+    void showQrForCurrentPage();     // 当前页二维码
+
 protected:
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *obj, QEvent *event) override;
