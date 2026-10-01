@@ -79,6 +79,32 @@ void AccountManager::signOut()
     emit signOutFinished();
 }
 
+void AccountManager::resetPassword(const QString &email)
+{
+    QNetworkRequest req{QUrl(QString::fromLatin1(kSupabaseUrl)
+                             + QStringLiteral("/auth/v1/recover"))};
+    req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    req.setRawHeader("apikey", kSupabaseKey);
+
+    QJsonObject body;
+    body.insert(QStringLiteral("email"), email);
+
+    QNetworkReply *reply = m_net->post(req, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            const QJsonObject o = QJsonDocument::fromJson(reply->readAll()).object();
+            QString msg = o.value(QStringLiteral("msg")).toString();
+            if (msg.isEmpty())
+                msg = reply->errorString();
+            emit resetPasswordFinished(false, msg);
+        } else {
+            emit resetPasswordFinished(true,
+                QStringLiteral("重置密码邮件已发送，请查收邮箱。"));
+        }
+    });
+}
+
 void AccountManager::handleAuthReply(QNetworkReply *reply, bool isSignUp)
 {
     reply->deleteLater();

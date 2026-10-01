@@ -31,9 +31,12 @@ AccountDialog::AccountDialog(AccountManager *account, QWidget *parent)
     m_loginPass = new QLineEdit(loginPage);
     m_loginPass->setEchoMode(QLineEdit::Password);
     auto *loginBtn = new QPushButton(QStringLiteral("登录"), loginPage);
+    auto *forgotBtn = new QPushButton(QStringLiteral("忘记密码"), loginPage);
+    forgotBtn->setFlat(true);
     loginForm->addRow(QStringLiteral("邮箱："), m_loginEmail);
     loginForm->addRow(QStringLiteral("密码："), m_loginPass);
     loginForm->addRow(QString(), loginBtn);
+    loginForm->addRow(QString(), forgotBtn);
     m_tabs->addTab(loginPage, QStringLiteral("登录"));
 
     // ---- 注册页 ----
@@ -58,6 +61,7 @@ AccountDialog::AccountDialog(AccountManager *account, QWidget *parent)
     layout->addWidget(m_signOutBtn);
 
     connect(loginBtn, &QPushButton::clicked, this, &AccountDialog::onSignIn);
+    connect(forgotBtn, &QPushButton::clicked, this, &AccountDialog::onForgotPassword);
     connect(regBtn, &QPushButton::clicked, this, &AccountDialog::onSignUp);
     connect(m_signOutBtn, &QPushButton::clicked, this, &AccountDialog::onSignOut);
     connect(m_account, &AccountManager::signInFinished, this,
@@ -72,6 +76,11 @@ AccountDialog::AccountDialog(AccountManager *account, QWidget *parent)
             });
     connect(m_account, &AccountManager::signOutFinished, this,
             [this]() { refreshUi(); });
+    connect(m_account, &AccountManager::resetPasswordFinished, this,
+            [this](bool ok, const QString &msg) {
+                if (ok) QMessageBox::information(this, QStringLiteral("忘记密码"), msg);
+                else    QMessageBox::warning(this, QStringLiteral("忘记密码"), msg);
+            });
 
     refreshUi();
 }
@@ -113,6 +122,17 @@ void AccountDialog::onSignUp()
 void AccountDialog::onSignOut()
 {
     m_account->signOut();
+}
+
+void AccountDialog::onForgotPassword()
+{
+    const QString email = m_loginEmail->text().trimmed();
+    if (email.isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("忘记密码"),
+            QStringLiteral("请先在上方填写邮箱，再点「忘记密码」。"));
+        return;
+    }
+    m_account->resetPassword(email);
 }
 
 void AccountDialog::refreshUi()

@@ -27,11 +27,13 @@ public:
     void signUp(const QString &email, const QString &password);
     void signIn(const QString &email, const QString &password);
     void signOut();
+    void resetPassword(const QString &email);   // 发送重置密码邮件
 
 signals:
     void signUpFinished(bool ok, const QString &message);
     void signInFinished(bool ok, const QString &message);
     void signOutFinished();
+    void resetPasswordFinished(bool ok, const QString &message);
 
 private:
     void handleAuthReply(class QNetworkReply *reply, bool isSignUp);

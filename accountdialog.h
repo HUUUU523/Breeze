@@ -21,6 +21,7 @@ private slots:
     void onSignIn();
     void onSignUp();
     void onSignOut();
+    void onForgotPassword();
     void refreshUi();
 
 private:
