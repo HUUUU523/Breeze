@@ -3579,6 +3579,22 @@ void BrowserWindow::capturePage()
         return;
     }
 
+    // 询问：保存到文件 / 复制到剪贴板
+    QMessageBox box(this);
+    box.setWindowTitle(QStringLiteral("截图"));
+    box.setText(QStringLiteral("截图完成，选择操作："));
+    QPushButton *copyBtn = box.addButton(QStringLiteral("复制到剪贴板"), QMessageBox::AcceptRole);
+    QPushButton *saveBtn = box.addButton(QStringLiteral("保存为文件…"), QMessageBox::ActionRole);
+    box.addButton(QStringLiteral("取消"), QMessageBox::RejectRole);
+    box.exec();
+    if (box.clickedButton() == copyBtn) {
+        QApplication::clipboard()->setPixmap(shot);
+        statusBar()->showMessage(QStringLiteral("截图已复制到剪贴板"), 3000);
+        return;
+    }
+    if (box.clickedButton() != saveBtn)
+        return;
+
     const QString path = QFileDialog::getSaveFileName(
         this, QStringLiteral("保存截图"),
         QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
