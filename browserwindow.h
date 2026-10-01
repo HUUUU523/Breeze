@@ -148,6 +148,11 @@ public:
     void saveReadingList() const;
     void loadReadingList();
 
+    // ---- 专注模式（番茄钟） ----
+    void startFocusMode();       // 弹出设置时长并开始
+    void stopFocusMode();
+    void tickFocus();            // 每秒更新
+
 protected:
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -351,6 +356,8 @@ private:
     QWidget *m_dragHighlight = nullptr;           // 书签拖拽时高亮的目标
     QVector<int> m_konamiBuffer;                  // Konami 密码按键缓冲
     QList<struct ReadingItem> m_readingList;      // 稍后读列表
+    class QTimer *m_focusTimer = nullptr;         // 专注模式计时器
+    int m_focusRemaining = 0;                     // 剩余秒数
     class BreezeWebPage *m_bgPage = nullptr;      // 扩展 background 隐藏页
     QUrl                m_homeUrl{"https://www.bing.com"};
 

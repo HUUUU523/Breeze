@@ -406,6 +406,53 @@ void BrowserWindow::showFunMessage()
     statusBar()->showMessage(QStringLiteral("💡 ") + kQuotes.at(idx), 8000);
 }
 
+// ===================== 专注模式 =====================
+
+void BrowserWindow::startFocusMode()
+{
+    bool ok = false;
+    const int minutes = QInputDialog::getInt(
+        this, QStringLiteral("专注模式"),
+        QStringLiteral("专注时长（分钟）："), 25, 1, 180, 5, &ok);
+    if (!ok)
+        return;
+
+    m_focusRemaining = minutes * 60;
+    if (!m_focusTimer) {
+        m_focusTimer = new QTimer(this);
+        connect(m_focusTimer, &QTimer::timeout, this, &BrowserWindow::tickFocus);
+    }
+    m_focusTimer->start(1000);
+    tickFocus();
+    statusBar()->showMessage(
+        QStringLiteral("🍅 专注模式已开始，共 %1 分钟").arg(minutes), 3000);
+}
+
+void BrowserWindow::stopFocusMode()
+{
+    if (m_focusTimer)
+        m_focusTimer->stop();
+    m_focusRemaining = 0;
+    statusBar()->showMessage(QStringLiteral("专注模式已结束"), 3000);
+}
+
+void BrowserWindow::tickFocus()
+{
+    if (m_focusRemaining <= 0) {
+        if (m_focusTimer)
+            m_focusTimer->stop();
+        QMessageBox::information(this, QStringLiteral("专注模式"),
+            QStringLiteral("🍅 专注时间到！休息一下吧。"));
+        return;
+    }
+    --m_focusRemaining;
+    const int m = m_focusRemaining / 60;
+    const int s = m_focusRemaining % 60;
+    statusBar()->showMessage(QStringLiteral("🍅 专注中：%1:%2")
+        .arg(m, 2, 10, QLatin1Char('0'))
+        .arg(s, 2, 10, QLatin1Char('0')));
+}
+
 // ===================== 稍后读 =====================
 
 void BrowserWindow::loadReadingList()
@@ -970,6 +1017,8 @@ void BrowserWindow::setupActions()
     QAction *actAccount = mainMenu->addAction(QStringLiteral("账号…"));
     QAction *actProfiles = mainMenu->addAction(QStringLiteral("用户…"));
     QAction *actReading = mainMenu->addAction(QStringLiteral("稍后读…"));
+    QAction *actFocus = mainMenu->addAction(QStringLiteral("🍅 专注模式…"));
+    QAction *actFocusStop = mainMenu->addAction(QStringLiteral("停止专注"));
     QAction *actEggs = mainMenu->addAction(QStringLiteral("🎉 彩蛋…"));
     QAction *actSync = mainMenu->addAction(QStringLiteral("云同步…"));
     mainMenu->addSeparator();
@@ -1049,6 +1098,8 @@ void BrowserWindow::setupActions()
         dlg.exec();
     });
     connect(actReading, &QAction::triggered, this, &BrowserWindow::showReadingList);
+    connect(actFocus, &QAction::triggered, this, &BrowserWindow::startFocusMode);
+    connect(actFocusStop, &QAction::triggered, this, &BrowserWindow::stopFocusMode);
     connect(actEggs, &QAction::triggered, this, [this]() {
         QMenu eggMenu(this);
         eggMenu.addAction(QStringLiteral("🌈 彩色方块雨"), this, [this]() {
