@@ -358,6 +358,7 @@ private:
     QList<struct ReadingItem> m_readingList;      // 稍后读列表
     class QTimer *m_focusTimer = nullptr;         // 专注模式计时器
     int m_focusRemaining = 0;                     // 剩余秒数
+    class WebView *m_lastActiveView = nullptr;    // 上一个活动的标签（用于保存滚动位置）
     class BreezeWebPage *m_bgPage = nullptr;      // 扩展 background 隐藏页
     QUrl                m_homeUrl{"https://www.bing.com"};
 

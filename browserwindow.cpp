@@ -2812,6 +2812,18 @@ void BrowserWindow::onTabChanged(int index)
 {
     Q_UNUSED(index);
     WebView *view = currentView();
+
+    // 保存上一个标签的滚动位置（异步读取）
+    if (m_lastActiveView && m_lastActiveView != view) {
+        WebView *prev = m_lastActiveView;
+        prev->page()->runJavaScript(QStringLiteral("window.scrollY"),
+            [prev](const QVariant &v) {
+                if (prev)
+                    prev->setProperty("breezeScrollY", v.toInt());
+            });
+    }
+    m_lastActiveView = view;
+
     if (!view) {
         m_urlBar->clear();
         return;
@@ -2823,6 +2835,18 @@ void BrowserWindow::onTabChanged(int index)
         view->setProperty("breezeSleeping", false);
         if (!u.isEmpty())
             view->setUrl(QUrl(u));
+    }
+
+    // 恢复该标签上次的滚动位置（延迟一点，等页面就绪）
+    const int savedY = view->property("breezeScrollY").toInt();
+    if (savedY > 0) {
+        WebView *vv = view;
+        const int y = savedY;
+        QTimer::singleShot(150, this, [vv, y]() {
+            if (vv)
+                vv->page()->runJavaScript(
+                    QStringLiteral("window.scrollTo(0,%1)").arg(y));
+        });
     }
     m_urlBar->setText(view->url().toString());
     m_urlBar->setCursorPosition(0);
