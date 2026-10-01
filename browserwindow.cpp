@@ -408,6 +408,87 @@ void BrowserWindow::showFunMessage()
     statusBar()->showMessage(QStringLiteral("💡 ") + kQuotes.at(idx), 8000);
 }
 
+// ===================== 媒体控制 =====================
+
+void BrowserWindow::showMediaControl()
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("媒体控制 - Breeze"));
+    dlg.resize(520, 360);
+    auto *lay = new QVBoxLayout(&dlg);
+
+    auto *info = new QLabel(QStringLiteral("正在播放音频的标签："), &dlg);
+    lay->addWidget(info);
+
+    auto *list = new QListWidget(&dlg);
+    lay->addWidget(list);
+
+    // 收集所有标签，标记正在播放的
+    struct Item { WebView *v; int index; };
+    QList<Item> items;
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        if (auto *v = qobject_cast<WebView *>(m_tabs->widget(i))) {
+            items.append({ v, i });
+            const bool audible = v->page() && v->page()->recentlyAudible();
+            const bool muted = v->page() && v->page()->isAudioMuted();
+            QString prefix = audible && !muted ? QStringLiteral("🔊 ")
+                           : muted ? QStringLiteral("🔇 ")
+                                   : QStringLiteral("   ");
+            QString title = v->title().isEmpty() ? v->url().host() : v->title();
+            if (title.isEmpty())
+                title = QStringLiteral("新标签页");
+            if (title.size() > 50)
+                title = title.left(50) + QStringLiteral("…");
+            auto *it = new QListWidgetItem(prefix + title, list);
+            it->setData(Qt::UserRole, i);
+        }
+    }
+
+    if (list->count() == 0) {
+        lay->addWidget(new QLabel(QStringLiteral("没有打开的标签。"), &dlg));
+    }
+
+    auto *row = new QHBoxLayout;
+    auto *goBtn = new QPushButton(QStringLiteral("跳转"), &dlg);
+    auto *muteBtn = new QPushButton(QStringLiteral("静音/取消静音"), &dlg);
+    auto *closeBtn = new QPushButton(QStringLiteral("关闭标签"), &dlg);
+    row->addWidget(goBtn);
+    row->addWidget(muteBtn);
+    row->addWidget(closeBtn);
+    row->addStretch();
+    lay->addLayout(row);
+
+    auto *closeDlg = new QPushButton(QStringLiteral("完成"), &dlg);
+    lay->addWidget(closeDlg);
+
+    connect(goBtn, &QPushButton::clicked, &dlg, [this, list]() {
+        auto *it = list->currentItem();
+        if (!it) return;
+        const int idx = it->data(Qt::UserRole).toInt();
+        if (idx >= 0 && idx < m_tabs->count())
+            m_tabs->setCurrentIndex(idx);
+    });
+    connect(muteBtn, &QPushButton::clicked, &dlg, [this, list]() {
+        auto *it = list->currentItem();
+        if (!it) return;
+        const int idx = it->data(Qt::UserRole).toInt();
+        if (auto *v = qobject_cast<WebView *>(m_tabs->widget(idx))) {
+            v->page()->setAudioMuted(!v->page()->isAudioMuted());
+            updateTabTitle(v);
+        }
+    });
+    connect(closeBtn, &QPushButton::clicked, &dlg, [this, list]() {
+        auto *it = list->currentItem();
+        if (!it) return;
+        const int idx = it->data(Qt::UserRole).toInt();
+        onCloseTab(idx);
+        delete it;
+    });
+    connect(closeDlg, &QPushButton::clicked, &dlg, &QDialog::accept);
+
+    dlg.exec();
+}
+
 // ===================== 朗读 =====================
 
 void BrowserWindow::speakText(const QString &text)
@@ -1076,6 +1157,7 @@ void BrowserWindow::setupActions()
     QAction *actAccount = mainMenu->addAction(QStringLiteral("账号…"));
     QAction *actProfiles = mainMenu->addAction(QStringLiteral("用户…"));
     QAction *actReading = mainMenu->addAction(QStringLiteral("稍后读…"));
+    QAction *actMedia = mainMenu->addAction(QStringLiteral("媒体控制…"));
     QAction *actFocus = mainMenu->addAction(QStringLiteral("🍅 专注模式…"));
     QAction *actFocusStop = mainMenu->addAction(QStringLiteral("停止专注"));
     QAction *actEggs = mainMenu->addAction(QStringLiteral("🎉 彩蛋…"));
@@ -1157,6 +1239,7 @@ void BrowserWindow::setupActions()
         dlg.exec();
     });
     connect(actReading, &QAction::triggered, this, &BrowserWindow::showReadingList);
+    connect(actMedia, &QAction::triggered, this, &BrowserWindow::showMediaControl);
     connect(actFocus, &QAction::triggered, this, &BrowserWindow::startFocusMode);
     connect(actFocusStop, &QAction::triggered, this, &BrowserWindow::stopFocusMode);
     connect(actEggs, &QAction::triggered, this, [this]() {

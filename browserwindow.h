@@ -148,6 +148,9 @@ public:
     void saveReadingList() const;
     void loadReadingList();
 
+    // ---- 媒体控制 ----
+    void showMediaControl();
+
     // ---- 朗读 ----
     void speakText(const QString &text);     // 用系统 TTS 朗读
     void speakSelectionOrPage();             // 朗读选中文字或整页正文
