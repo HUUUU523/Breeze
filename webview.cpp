@@ -345,6 +345,13 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
                 connect(aiMenu->addAction(QStringLiteral("改写")), &QAction::triggered, this,
                         [this, t]() { emit aiActionRequested(QStringLiteral("rewrite"), t); });
 
+                // 复制为 Markdown
+                menu.addAction(QStringLiteral("复制为 Markdown 链接"), this, [this, t]() {
+                    const QString md = QStringLiteral("[%1](%2)")
+                        .arg(t.left(80).replace(QLatin1Char(']'), QLatin1Char(')')),
+                             url().toString());
+                    QApplication::clipboard()->setText(md);
+                });
                 // 高亮选中文字
                 menu.addAction(QStringLiteral("🖍 高亮选中"), this, [this]() {
                     page()->runJavaScript(QStringLiteral(
@@ -420,6 +427,22 @@ void WebView::contextMenuEvent(QContextMenuEvent *event)
                     "document.querySelectorAll('mark[data-breeze-mark]').forEach(function(m){"
                     "var t=document.createTextNode(m.textContent);"
                     "m.parentNode.replaceChild(t,m);});"
+                    "})();"));
+            });
+            menu.addAction(QStringLiteral("📺 画中画"), this, [this]() {
+                page()->runJavaScript(QStringLiteral(
+                    "(function(){"
+                    "var vs=document.querySelectorAll('video');"
+                    "var best=null,bestArea=0;"
+                    "for(var i=0;i<vs.length;i++){"
+                    "var v=vs[i];var a=(v.clientWidth||0)*(v.clientHeight||0);"
+                    "if(a>bestArea){bestArea=a;best=v;}}"
+                    "if(!best){alert('未找到视频');return;}"
+                    "if(document.pictureInPictureElement){"
+                    "document.exitPictureInPicture();}"
+                    "else if(best.requestPictureInPicture){"
+                    "best.requestPictureInPicture().catch(function(e){alert('画中画失败: '+e);});"
+                    "}else{alert('浏览器不支持画中画');}"
                     "})();"));
             });
             menu.addSeparator();
