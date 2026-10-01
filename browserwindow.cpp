@@ -587,6 +587,98 @@ void BrowserWindow::showNoteForCurrentPage()
     dlg.exec();
 }
 
+// ===================== 页面性能 =====================
+
+void BrowserWindow::showPagePerformance()
+{
+    WebView *v = currentView();
+    if (!v || v->url().isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("页面性能"),
+                                 QStringLiteral("没有可分析的页面。"));
+        return;
+    }
+    // 注入 JS 收集性能指标
+    v->page()->runJavaScript(QStringLiteral(
+        "(function(){"
+        "var out={};"
+        "try{"
+        "var nav=performance.getEntriesByType('navigation')[0]||{};"
+        "out.dns=Math.round(nav.domainLookupEnd-nav.domainLookupStart)||0;"
+        "out.tcp=Math.round(nav.connectEnd-nav.connectStart)||0;"
+        "out.ttfb=Math.round(nav.responseStart-nav.requestStart)||0;"
+        "out.download=Math.round(nav.responseEnd-nav.responseStart)||0;"
+        "out.domReady=Math.round(nav.domContentLoadedEventEnd-nav.startTime)||0;"
+        "out.load=Math.round(nav.loadEventEnd-nav.startTime)||0;"
+        "out.redirect=Math.round(nav.redirectEnd-nav.redirectStart)||0;"
+        "}catch(e){}"
+        "out.domNodes=document.getElementsByTagName('*').length;"
+        "var res=performance.getEntriesByType('resource');"
+        "out.resCount=res.length;"
+        "var totalSize=0,byType={};"
+        "for(var i=0;i<res.length;i++){"
+        "var r=res[i];"
+        "var t=r.initiatorType||'other';"
+        "byType[t]=(byType[t]||0)+1;"
+        "totalSize+=(r.transferSize||0);}"
+        "out.totalSize=totalSize;"
+        "out.byType=JSON.stringify(byType);"
+        "out.scripts=document.scripts.length;"
+        "out.images=document.images.length;"
+        "out.stylesheets=document.styleSheets.length;"
+        "return JSON.stringify(out);"
+        "})();"),
+        [this](const QVariant &r) {
+            const QJsonObject o = QJsonDocument::fromJson(r.toString().toUtf8()).object();
+            const auto ms = [](int v) { return QStringLiteral("%1 ms").arg(v); };
+            const auto kb = [](qint64 v) { return QStringLiteral("%1 KB").arg(v / 1024.0, 0, 'f', 1); };
+
+            QDialog dlg(this);
+            dlg.setWindowTitle(QStringLiteral("页面性能 - Breeze"));
+            dlg.resize(460, 520);
+            auto *lay = new QVBoxLayout(&dlg);
+            auto *text = new QTextEdit(&dlg);
+            text->setReadOnly(true);
+            text->setHtml(QStringLiteral(
+                "<h3>⏱ 导航时序</h3><table cellpadding=4>"
+                "<tr><td>DNS 查询</td><td><b>%1</b></td></tr>"
+                "<tr><td>TCP 连接</td><td><b>%2</b></td></tr>"
+                "<tr><td>重定向</td><td><b>%3</b></td></tr>"
+                "<tr><td>首字节（TTFB）</td><td><b>%4</b></td></tr>"
+                "<tr><td>内容下载</td><td><b>%5</b></td></tr>"
+                "<tr><td>DOM 就绪</td><td><b>%6</b></td></tr>"
+                "<tr><td>页面完全加载</td><td><b>%7</b></td></tr>"
+                "</table>"
+                "<h3>📊 页面结构</h3><table cellpadding=4>"
+                "<tr><td>DOM 节点数</td><td><b>%8</b></td></tr>"
+                "<tr><td>脚本数</td><td><b>%9</b></td></tr>"
+                "<tr><td>图片数</td><td><b>%10</b></td></tr>"
+                "<tr><td>样式表数</td><td><b>%11</b></td></tr>"
+                "</table>"
+                "<h3>📦 资源</h3><table cellpadding=4>"
+                "<tr><td>资源总数</td><td><b>%12</b></td></tr>"
+                "<tr><td>传输大小</td><td><b>%13</b></td></tr>"
+                "</table>")
+                .arg(ms(o.value(QStringLiteral("dns")).toInt()))
+                .arg(ms(o.value(QStringLiteral("tcp")).toInt()))
+                .arg(ms(o.value(QStringLiteral("redirect")).toInt()))
+                .arg(ms(o.value(QStringLiteral("ttfb")).toInt()))
+                .arg(ms(o.value(QStringLiteral("download")).toInt()))
+                .arg(ms(o.value(QStringLiteral("domReady")).toInt()))
+                .arg(ms(o.value(QStringLiteral("load")).toInt()))
+                .arg(o.value(QStringLiteral("domNodes")).toInt())
+                .arg(o.value(QStringLiteral("scripts")).toInt())
+                .arg(o.value(QStringLiteral("images")).toInt())
+                .arg(o.value(QStringLiteral("stylesheets")).toInt())
+                .arg(o.value(QStringLiteral("resCount")).toInt())
+                .arg(kb(qint64(o.value(QStringLiteral("totalSize")).toDouble()))));
+            lay->addWidget(text);
+            auto *closeBtn = new QPushButton(QStringLiteral("关闭"), &dlg);
+            lay->addWidget(closeBtn);
+            connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+            dlg.exec();
+        });
+}
+
 // ===================== 元素截图 =====================
 
 void BrowserWindow::captureRect(const QRect &rect)
@@ -1035,6 +1127,7 @@ void BrowserWindow::showCommandPalette()
         { QStringLiteral("当前页二维码"), QStringLiteral("qr code erweima"), [this]() { showQrForCurrentPage(); } },
         { QStringLiteral("朗读选中/整页"), QStringLiteral("speak tts langsong"), [this]() { speakSelectionOrPage(); } },
         { QStringLiteral("元素截图"), QStringLiteral("element screenshot yuansu"), [this]() { captureElement(); } },
+        { QStringLiteral("页面性能"), QStringLiteral("performance xingneng"), [this]() { showPagePerformance(); } },
         { QStringLiteral("截图当前页"), QStringLiteral("screenshot jietu"), [this]() { capturePage(); } },
         { QStringLiteral("整页截图"), QStringLiteral("fullpage screenshot"), [this]() { captureFullPage(); } },
         { QStringLiteral("打印"), QStringLiteral("print dayin"), [this]() { printPage(); } },

@@ -151,6 +151,9 @@ public:
     // ---- 媒体控制 ----
     void showMediaControl();
 
+    // ---- 页面性能 ----
+    void showPagePerformance();
+
     // ---- 元素截图 ----
     void captureElement();   // 点击页面元素截图
     void captureRect(const QRect &rect);   // 截取视口内的矩形区域
