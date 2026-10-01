@@ -25,6 +25,7 @@ namespace {
 const char *kHoverPrefix  = "__BREEZE_HOVER__:";
 const char *kSelectPrefix = "__BREEZE_SELECT__:";
 const char *kExtMsgPrefix = "__BREEZE_EXTMSG__:";
+const char *kTabsCmdPrefix = "__BREEZE_TABSCMD__:";
 }
 
 BreezeWebPage::BreezeWebPage(QWebEngineProfile *profile, QObject *parent)
@@ -51,6 +52,10 @@ void BreezeWebPage::javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level
     }
     if (message.startsWith(QLatin1String(kExtMsgPrefix))) {
         emit extMessage(message.mid(int(qstrlen(kExtMsgPrefix))));
+        return;
+    }
+    if (message.startsWith(QLatin1String(kTabsCmdPrefix))) {
+        emit tabsCommand(message.mid(int(qstrlen(kTabsCmdPrefix))));
         return;
     }
     if (message.startsWith(QLatin1String(kSelectPrefix))) {
@@ -96,6 +101,8 @@ void WebView::connectPageSignals()
             this, &WebView::selectionActionRequested);
     connect(bp, &BreezeWebPage::extMessage,
             this, &WebView::extMessage);
+    connect(bp, &BreezeWebPage::tabsCommand,
+            this, &WebView::tabsCommand);
     connect(bp, &QWebEnginePage::certificateError,
             this, &WebView::onCertificateError);
 }

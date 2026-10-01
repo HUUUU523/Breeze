@@ -25,6 +25,8 @@ signals:
     void selectionActionRequested(const QString &action, const QString &text);
     // 扩展消息总线：页面通过 chrome.runtime.sendMessage 发出的消息
     void extMessage(const QString &json);
+    // 扩展 tabs 命令（chrome.tabs.remove/reload 等）
+    void tabsCommand(const QString &json);
 
 protected:
     void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level,
@@ -78,6 +80,8 @@ signals:
 
     // 扩展消息总线：页面通过 chrome.runtime.sendMessage 发出的消息
     void extMessage(const QString &json);
+    // 扩展 tabs 命令（chrome.tabs.remove/reload 等）
+    void tabsCommand(const QString &json);
 
 
 protected:

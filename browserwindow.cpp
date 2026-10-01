@@ -1957,6 +1957,20 @@ WebView *BrowserWindow::createTabView(bool privateMode)
             statusBar()->showMessage(u);
     });
 
+    // 扩展 tabs 命令：remove / reload
+    connect(view, &WebView::tabsCommand, this, [this, view](const QString &json) {
+        const QJsonObject o = QJsonDocument::fromJson(json.toUtf8()).object();
+        const QString op = o.value(QStringLiteral("op")).toString();
+        if (op == QStringLiteral("remove")) {
+            const int idx = m_tabs->indexOf(view);
+            if (idx >= 0)
+                onCloseTab(idx);
+        } else if (op == QStringLiteral("reload")) {
+            if (view)
+                view->reload();
+        }
+    });
+
     // 扩展消息总线：把某标签页发出的消息广播给所有标签页
     connect(view, &WebView::extMessage, this, [this](const QString &json) {
         if (!m_tabs)
@@ -2932,6 +2946,19 @@ void BrowserWindow::injectExtensionScripts(WebView *view, const QUrl &url)
                 "window.chrome.tabs.sendMessage=function(id,msg,cb){"
                 "try{console.log('__BREEZE_EXTMSG__:'+JSON.stringify(msg));}catch(e){}"
                 "if(typeof cb==='function')cb({ok:true});};"
+                // 真实标签操作（经 C++ 桥接）
+                "window.chrome.tabs.update=function(tabId,props,cb){"
+                "if(props&&props.url)location.href=props.url;"
+                "if(typeof cb==='function')cb({id:tabId,url:location.href});};"
+                "window.chrome.tabs.remove=function(tabId,cb){"
+                "try{console.log('__BREEZE_TABSCMD__:'+JSON.stringify({op:'remove',id:tabId}));}catch(e){}"
+                "if(typeof cb==='function')cb();};"
+                "window.chrome.tabs.reload=function(tabId,cb){"
+                "try{console.log('__BREEZE_TABSCMD__:'+JSON.stringify({op:'reload',id:tabId}));}catch(e){}"
+                "if(typeof cb==='function')cb();};"
+                "window.chrome.tabs.getCurrent=function(cb){"
+                "if(typeof cb==='function')cb({"
+                "url:location.href,title:document.title,active:true});};"
                 "})();");
 
             QWebEngineScript qs;
