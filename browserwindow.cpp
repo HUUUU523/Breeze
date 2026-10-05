@@ -1309,6 +1309,7 @@ void BrowserWindow::showCommandPalette()
         { QStringLiteral("元素截图"), QStringLiteral("element screenshot yuansu"), [this]() { captureElement(); } },
         { QStringLiteral("页面性能"), QStringLiteral("performance xingneng"), [this]() { showPagePerformance(); } },
         { QStringLiteral("标签总览"), QStringLiteral("tab overview zonglan"), [this]() { showTabOverview(); } },
+        { QStringLiteral("搜索标签"), QStringLiteral("tab search sousuo"), [this]() { showTabSearch(); } },
         { QStringLiteral("待办事项"), QStringLiteral("todo daiban"), [this]() { showTodoList(); } },
         { QStringLiteral("增大网页字号"), QStringLiteral("font bigger zihao"), [this]() { increaseFontSize(); } },
         { QStringLiteral("减小网页字号"), QStringLiteral("font smaller zihao"), [this]() { decreaseFontSize(); } },
@@ -1904,6 +1905,7 @@ void BrowserWindow::setupActions()
         if (m_tabs->count() > 1) m_tabs->setCurrentIndex((m_tabs->currentIndex() - 1 + m_tabs->count()) % m_tabs->count());
     });
     addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+A")), [this]{ showTabOverview(); });
+    addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+P")), [this]{ showTabSearch(); });
 
     connect(m_urlBar, &QLineEdit::returnPressed, this, &BrowserWindow::onUrlEntered);
 
@@ -3459,6 +3461,65 @@ void BrowserWindow::showTabOverview()
     });
     dlg->setAttribute(Qt::WA_DeleteOnClose);
     dlg->exec();
+}
+
+void BrowserWindow::showTabSearch()
+{
+    if (m_tabs->count() == 0)
+        return;
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("搜索标签"));
+    dlg.resize(420, 360);
+    auto *lay = new QVBoxLayout(&dlg);
+
+    auto *input = new QLineEdit(&dlg);
+    input->setPlaceholderText(QStringLiteral("输入关键词过滤标签…"));
+    input->setClearButtonEnabled(true);
+    lay->addWidget(input);
+
+    auto *list = new QListWidget(&dlg);
+    lay->addWidget(list);
+
+    // 填充所有标签
+    auto fill = [list, this](const QString &filter) {
+        list->clear();
+        const QString f = filter.trimmed();
+        for (int i = 0; i < m_tabs->count(); ++i) {
+            const QString title = m_tabs->tabText(i);
+            if (!f.isEmpty() && !title.contains(f, Qt::CaseInsensitive))
+                continue;
+            auto *it = new QListWidgetItem(QStringLiteral("%1  %2").arg(i + 1).arg(title), list);
+            it->setData(Qt::UserRole, i);
+            if (i == m_tabs->currentIndex())
+                it->setForeground(QColor(0x3a, 0x9e, 0xdb));
+        }
+        if (list->count() > 0)
+            list->setCurrentRow(0);
+    };
+    fill(QString());
+
+    connect(input, &QLineEdit::textChanged, &dlg, [fill](const QString &t) { fill(t); });
+
+    auto activate = [this, &dlg, list]() {
+        auto *it = list->currentItem();
+        if (!it)
+            return;
+        const int idx = it->data(Qt::UserRole).toInt();
+        if (idx >= 0 && idx < m_tabs->count()) {
+            m_tabs->setCurrentIndex(idx);
+            dlg.accept();
+        }
+    };
+    connect(list, &QListWidget::itemActivated, &dlg, [&](QListWidgetItem *) { activate(); });
+    connect(input, &QLineEdit::returnPressed, &dlg, [&]() { activate(); });
+
+    auto *hint = new QLabel(QStringLiteral("回车或双击切换到选中标签。"), &dlg);
+    hint->setStyleSheet(QStringLiteral("color:#888;"));
+    lay->addWidget(hint);
+
+    input->setFocus();
+    dlg.exec();
 }
 
 void BrowserWindow::showUrlParamEditor()
