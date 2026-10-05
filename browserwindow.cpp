@@ -117,6 +117,7 @@ BrowserWindow::BrowserWindow(QWidget *parent)
     loadReadingList();
     loadNotes();
     loadClipboardHistory();
+    loadTodos();
     connect(QApplication::clipboard(), &QClipboard::dataChanged,
             this, &BrowserWindow::recordClipboard);
 
@@ -414,6 +415,138 @@ void BrowserWindow::showFunMessage()
     };
     const int idx = QDate::currentDate().toJulianDay() % kQuotes.size();
     statusBar()->showMessage(QStringLiteral("💡 ") + kQuotes.at(idx), 8000);
+}
+
+// ===================== 待办事项 =====================
+
+void BrowserWindow::loadTodos()
+{
+    const QString path = ProfileManager::dataDir() + QStringLiteral("/todos.json");
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return;
+    const QJsonArray arr = QJsonDocument::fromJson(f.readAll()).array();
+    m_todos.clear();
+    for (const QJsonValue &v : arr)
+        if (v.isString())
+            m_todos << v.toString();
+}
+
+void BrowserWindow::saveTodos() const
+{
+    QJsonArray arr;
+    for (const QString &s : m_todos)
+        arr.append(s);
+    const QString path = ProfileManager::dataDir() + QStringLiteral("/todos.json");
+    QFile f(path);
+    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        f.write(QJsonDocument(arr).toJson(QJsonDocument::Indented));
+}
+
+void BrowserWindow::showTodoList()
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("待办事项 - Breeze"));
+    dlg.resize(460, 480);
+    auto *lay = new QVBoxLayout(&dlg);
+    lay->addWidget(new QLabel(QStringLiteral("勾选表示已完成，双击可编辑。"), &dlg));
+
+    auto *list = new QListWidget(&dlg);
+    auto refresh = [list, this]() {
+        list->clear();
+        for (const QString &t : m_todos) {
+            auto *it = new QListWidgetItem(t, list);
+            it->setFlags(it->flags() | Qt::ItemIsUserCheckable);
+            it->setCheckState(t.startsWith(QStringLiteral("[x] "))
+                              ? Qt::Checked : Qt::Unchecked);
+            it->setData(Qt::UserRole, t);
+        }
+    };
+    refresh();
+    lay->addWidget(list);
+
+    // 添加输入行
+    auto *inputRow = new QHBoxLayout;
+    auto *input = new QLineEdit(&dlg);
+    input->setPlaceholderText(QStringLiteral("新增待办…"));
+    auto *addBtn = new QPushButton(QStringLiteral("添加"), &dlg);
+    inputRow->addWidget(input, 1);
+    inputRow->addWidget(addBtn);
+    lay->addLayout(inputRow);
+
+    auto *btnRow = new QHBoxLayout;
+    auto *delBtn = new QPushButton(QStringLiteral("删除选中"), &dlg);
+    auto *clearBtn = new QPushButton(QStringLiteral("清除已完成"), &dlg);
+    auto *closeBtn = new QPushButton(QStringLiteral("关闭"), &dlg);
+    btnRow->addWidget(delBtn);
+    btnRow->addWidget(clearBtn);
+    btnRow->addStretch();
+    btnRow->addWidget(closeBtn);
+    lay->addLayout(btnRow);
+
+    auto addTodo = [&]() {
+        const QString text = input->text().trimmed();
+        if (text.isEmpty())
+            return;
+        m_todos << QStringLiteral("[ ] ") + text;
+        saveTodos();
+        input->clear();
+        refresh();
+    };
+    connect(addBtn, &QPushButton::clicked, &dlg, addTodo);
+    connect(input, &QLineEdit::returnPressed, &dlg, addTodo);
+    connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+
+    connect(list, &QListWidget::itemChanged, &dlg, [this, refresh](QListWidgetItem *it) {
+        const QString raw = it->data(Qt::UserRole).toString();
+        QString body = raw;
+        if (body.startsWith(QStringLiteral("[x] ")) || body.startsWith(QStringLiteral("[ ] ")))
+            body = body.mid(4);
+        const QString updated = (it->checkState() == Qt::Checked
+                                 ? QStringLiteral("[x] ") : QStringLiteral("[ ] ")) + body;
+        const int idx = m_todos.indexOf(raw);
+        if (idx >= 0) {
+            m_todos[idx] = updated;
+            it->setData(Qt::UserRole, updated);
+            saveTodos();
+        }
+    });
+    connect(list, &QListWidget::itemDoubleClicked, &dlg,
+            [this, list, refresh, &dlg](QListWidgetItem *it) {
+        const QString raw = it->data(Qt::UserRole).toString();
+        QString body = raw;
+        if (body.startsWith(QStringLiteral("[x] ")) || body.startsWith(QStringLiteral("[ ] ")))
+            body = body.mid(4);
+        bool ok = false;
+        const QString text = QInputDialog::getText(&dlg, QStringLiteral("编辑待办"),
+                                                   QStringLiteral("内容："),
+                                                   QLineEdit::Normal, body, &ok);
+        if (!ok || text.trimmed().isEmpty())
+            return;
+        const int idx = m_todos.indexOf(raw);
+        if (idx >= 0) {
+            m_todos[idx] = QStringLiteral("[ ] ") + text.trimmed();
+            saveTodos();
+            refresh();
+        }
+    });
+    connect(delBtn, &QPushButton::clicked, &dlg, [this, list, refresh]() {
+        auto *it = list->currentItem();
+        if (!it)
+            return;
+        m_todos.removeAll(it->data(Qt::UserRole).toString());
+        saveTodos();
+        refresh();
+    });
+    connect(clearBtn, &QPushButton::clicked, &dlg, [this, refresh]() {
+        for (int i = m_todos.size() - 1; i >= 0; --i)
+            if (m_todos[i].startsWith(QStringLiteral("[x] ")))
+                m_todos.removeAt(i);
+        saveTodos();
+        refresh();
+    });
+
+    dlg.exec();
 }
 
 // ===================== 剪贴板历史 =====================
@@ -1176,6 +1309,7 @@ void BrowserWindow::showCommandPalette()
         { QStringLiteral("元素截图"), QStringLiteral("element screenshot yuansu"), [this]() { captureElement(); } },
         { QStringLiteral("页面性能"), QStringLiteral("performance xingneng"), [this]() { showPagePerformance(); } },
         { QStringLiteral("标签总览"), QStringLiteral("tab overview zonglan"), [this]() { showTabOverview(); } },
+        { QStringLiteral("待办事项"), QStringLiteral("todo daiban"), [this]() { showTodoList(); } },
         { QStringLiteral("增大网页字号"), QStringLiteral("font bigger zihao"), [this]() { increaseFontSize(); } },
         { QStringLiteral("减小网页字号"), QStringLiteral("font smaller zihao"), [this]() { decreaseFontSize(); } },
         { QStringLiteral("截图当前页"), QStringLiteral("screenshot jietu"), [this]() { capturePage(); } },
@@ -1583,6 +1717,7 @@ void BrowserWindow::setupActions()
     QAction *actReading = mainMenu->addAction(QStringLiteral("稍后读…"));
     QAction *actNote = mainMenu->addAction(QStringLiteral("📝 网页笔记…"));
     QAction *actClip = mainMenu->addAction(QStringLiteral("📋 剪贴板历史…"));
+    QAction *actTodo = mainMenu->addAction(QStringLiteral("✅ 待办事项…"));
     QAction *actOverview = mainMenu->addAction(QStringLiteral("🗂 标签总览…"));
     connect(actOverview, &QAction::triggered, this, &BrowserWindow::showTabOverview);
 
@@ -1675,6 +1810,7 @@ void BrowserWindow::setupActions()
     }
     connect(actNote, &QAction::triggered, this, &BrowserWindow::showNoteForCurrentPage);
     connect(actClip, &QAction::triggered, this, &BrowserWindow::showClipboardHistory);
+    connect(actTodo, &QAction::triggered, this, &BrowserWindow::showTodoList);
     connect(actMedia, &QAction::triggered, this, &BrowserWindow::showMediaControl);
     connect(actFocus, &QAction::triggered, this, &BrowserWindow::startFocusMode);
     connect(actFocusStop, &QAction::triggered, this, &BrowserWindow::stopFocusMode);
