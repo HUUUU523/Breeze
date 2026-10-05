@@ -207,6 +207,7 @@ private slots:
     void showTabOverview();                // 标签总览网格
     void showUrlParamEditor();             // URL 参数编辑器
     void showTabSearch();                  // 标签搜索/过滤
+    void exportHighlights();               // 导出本页高亮标注
     void setTabAutoRefresh(WebView *view, int seconds);  // 定时刷新（0=关闭）
 
     // ---- 导航 ----

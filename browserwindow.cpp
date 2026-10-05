@@ -1219,6 +1219,59 @@ void BrowserWindow::exportReadingList()
         QStringLiteral("已导出 %1 条稍后读。").arg(m_readingList.size()));
 }
 
+void BrowserWindow::exportHighlights()
+{
+    WebView *v = currentView();
+    if (!v || v->url().isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("导出高亮"),
+                                 QStringLiteral("当前没有页面。"));
+        return;
+    }
+    v->page()->runJavaScript(QStringLiteral(
+        "(function(){"
+        "var ms=document.querySelectorAll('mark[data-breeze-mark]');"
+        "var out=[];"
+        "for(var i=0;i<ms.length;i++){"
+        "var t=(ms[i].textContent||'').trim();"
+        "if(t)out.push(t);}"
+        "return JSON.stringify(out);"
+        "})();"),
+        [this, v](const QVariant &r) {
+            const QJsonArray arr = QJsonDocument::fromJson(r.toString().toUtf8()).array();
+            if (arr.isEmpty()) {
+                QMessageBox::information(this, QStringLiteral("导出高亮"),
+                                         QStringLiteral("本页没有高亮标注。"));
+                return;
+            }
+            const QString title = v->title().isEmpty() ? v->url().toString() : v->title();
+            QString md;
+            md += QStringLiteral("# %1").arg(title) + QChar(10) + QChar(10);
+            md += QStringLiteral("> 来源：%1").arg(v->url().toString()) + QChar(10) + QChar(10);
+            md += QStringLiteral("共 %1 条高亮：").arg(arr.size()) + QChar(10) + QChar(10);
+            for (const QJsonValue &val : arr)
+                md += QStringLiteral("- ") + val.toString() + QChar(10);
+
+            const QString path = QFileDialog::getSaveFileName(
+                this, QStringLiteral("导出高亮标注"),
+                QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+                    + QStringLiteral("/breeze-highlights.md"),
+                QStringLiteral("Markdown (*.md);;文本文件 (*.txt)"));
+            if (path.isEmpty())
+                return;
+            QFile f(path);
+            if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                QMessageBox::warning(this, QStringLiteral("导出失败"),
+                                     QStringLiteral("无法写入文件。"));
+                return;
+            }
+            QTextStream ts(&f);
+            ts.setEncoding(QStringConverter::Utf8);
+            ts << md;
+            f.close();
+            statusBar()->showMessage(QStringLiteral("已导出 %1 条高亮").arg(arr.size()), 3000);
+        });
+}
+
 void BrowserWindow::showQrForCurrentPage()
 {
     WebView *v = currentView();
@@ -1310,6 +1363,7 @@ void BrowserWindow::showCommandPalette()
         { QStringLiteral("页面性能"), QStringLiteral("performance xingneng"), [this]() { showPagePerformance(); } },
         { QStringLiteral("标签总览"), QStringLiteral("tab overview zonglan"), [this]() { showTabOverview(); } },
         { QStringLiteral("搜索标签"), QStringLiteral("tab search sousuo"), [this]() { showTabSearch(); } },
+        { QStringLiteral("导出高亮标注"), QStringLiteral("highlight export gaoliang"), [this]() { exportHighlights(); } },
         { QStringLiteral("待办事项"), QStringLiteral("todo daiban"), [this]() { showTodoList(); } },
         { QStringLiteral("增大网页字号"), QStringLiteral("font bigger zihao"), [this]() { increaseFontSize(); } },
         { QStringLiteral("减小网页字号"), QStringLiteral("font smaller zihao"), [this]() { decreaseFontSize(); } },
