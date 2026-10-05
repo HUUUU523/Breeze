@@ -19,6 +19,7 @@
 #include "syncdialog.h"
 #include "qrcodegen.h"
 #include "toolbox.h"
+#include "taboverviewdialog.h"
 #include "taskmanagerdialog.h"
 #include "translator.h"
 #include "updatemanager.h"
@@ -1171,6 +1172,7 @@ void BrowserWindow::showCommandPalette()
         { QStringLiteral("朗读选中/整页"), QStringLiteral("speak tts langsong"), [this]() { speakSelectionOrPage(); } },
         { QStringLiteral("元素截图"), QStringLiteral("element screenshot yuansu"), [this]() { captureElement(); } },
         { QStringLiteral("页面性能"), QStringLiteral("performance xingneng"), [this]() { showPagePerformance(); } },
+        { QStringLiteral("标签总览"), QStringLiteral("tab overview zonglan"), [this]() { showTabOverview(); } },
         { QStringLiteral("增大网页字号"), QStringLiteral("font bigger zihao"), [this]() { increaseFontSize(); } },
         { QStringLiteral("减小网页字号"), QStringLiteral("font smaller zihao"), [this]() { decreaseFontSize(); } },
         { QStringLiteral("截图当前页"), QStringLiteral("screenshot jietu"), [this]() { capturePage(); } },
@@ -1567,6 +1569,9 @@ void BrowserWindow::setupActions()
     QAction *actReading = mainMenu->addAction(QStringLiteral("稍后读…"));
     QAction *actNote = mainMenu->addAction(QStringLiteral("📝 网页笔记…"));
     QAction *actClip = mainMenu->addAction(QStringLiteral("📋 剪贴板历史…"));
+    QAction *actOverview = mainMenu->addAction(QStringLiteral("🗂 标签总览…"));
+    connect(actOverview, &QAction::triggered, this, &BrowserWindow::showTabOverview);
+
     QAction *actMedia = mainMenu->addAction(QStringLiteral("媒体控制…"));
     QAction *actFocus = mainMenu->addAction(QStringLiteral("🍅 专注模式…"));
     QAction *actFocusStop = mainMenu->addAction(QStringLiteral("停止专注"));
@@ -1748,6 +1753,7 @@ void BrowserWindow::setupActions()
     addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+Tab")), [this]{
         if (m_tabs->count() > 1) m_tabs->setCurrentIndex((m_tabs->currentIndex() - 1 + m_tabs->count()) % m_tabs->count());
     });
+    addShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+A")), [this]{ showTabOverview(); });
 
     connect(m_urlBar, &QLineEdit::returnPressed, this, &BrowserWindow::onUrlEntered);
 
@@ -3286,6 +3292,23 @@ void BrowserWindow::onTabBarContextMenu(const QPoint &pos)
     connect(actClose, &QAction::triggered, this, [this, index]() { onCloseTab(index); });
 
     menu.exec(m_tabs->tabBar()->mapToGlobal(pos));
+}
+
+void BrowserWindow::showTabOverview()
+{
+    if (m_tabs->count() == 0)
+        return;
+    auto *dlg = new TabOverviewDialog(m_tabs, this);
+    connect(dlg, &TabOverviewDialog::tabActivated, this, [this](int index) {
+        if (index >= 0 && index < m_tabs->count())
+            m_tabs->setCurrentIndex(index);
+    });
+    connect(dlg, &TabOverviewDialog::tabClosed, this, [this](int index) {
+        if (index >= 0 && index < m_tabs->count())
+            onCloseTab(index);
+    });
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->exec();
 }
 
 void BrowserWindow::togglePinTab(int index)

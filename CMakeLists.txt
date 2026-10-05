@@ -39,6 +39,8 @@ qt_add_executable(Breeze WIN32
     segmenteddownload.cpp
     taskmanagerdialog.h
     taskmanagerdialog.cpp
+    taboverviewdialog.h
+    taboverviewdialog.cpp
     historymanager.h
     historymanager.cpp
     settingsdialog.h

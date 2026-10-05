@@ -199,6 +199,7 @@ private slots:
     void showTabSwitcher();                // Ctrl+Shift+A 标签搜索
     void showBlockedDetails();             // 盾牌点击：查看已拦截列表
     void togglePinTab(int index);          // 固定/取消固定标签
+    void showTabOverview();                // 标签总览网格
     void setTabAutoRefresh(WebView *view, int seconds);  // 定时刷新（0=关闭）
 
     // ---- 导航 ----
