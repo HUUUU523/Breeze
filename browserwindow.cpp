@@ -31,6 +31,9 @@
 #include <QClipboard>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QHeaderView>
+#include <QTableWidget>
+#include <QUrlQuery>
 #include <QVBoxLayout>
 #include <QKeySequence>
 #include <QLineEdit>
@@ -1477,6 +1480,17 @@ void BrowserWindow::setupActions()
                     onUrlEntered();
                 }
             });
+
+    // URL 参数编辑器按钮
+    {
+        auto *paramBtn = new QToolButton(this);
+        paramBtn->setText(QStringLiteral("⚙"));
+        paramBtn->setToolTip(QStringLiteral("编辑 URL 参数"));
+        paramBtn->setCursor(Qt::PointingHandCursor);
+        paramBtn->setAutoRaise(true);
+        connect(paramBtn, &QToolButton::clicked, this, &BrowserWindow::showUrlParamEditor);
+        navBar->addWidget(paramBtn);
+    }
 
     // 盾牌：显示当前站点拦截数
     m_shieldLabel = new QLabel(this);
@@ -3309,6 +3323,85 @@ void BrowserWindow::showTabOverview()
     });
     dlg->setAttribute(Qt::WA_DeleteOnClose);
     dlg->exec();
+}
+
+void BrowserWindow::showUrlParamEditor()
+{
+    WebView *v = currentView();
+    if (!v || v->url().isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("URL 参数"),
+                                 QStringLiteral("当前没有可编辑的页面。"));
+        return;
+    }
+    QUrl url = v->url();
+    if (url.scheme() != QStringLiteral("http") && url.scheme() != QStringLiteral("https")) {
+        QMessageBox::information(this, QStringLiteral("URL 参数"),
+                                 QStringLiteral("仅支持编辑 http/https 页面。"));
+        return;
+    }
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("URL 参数编辑器"));
+    dlg.resize(560, 420);
+    auto *lay = new QVBoxLayout(&dlg);
+    auto *baseLbl = new QLabel(QStringLiteral("<b>%1://%2%3</b>")
+        .arg(url.scheme(), url.host(), url.path().toHtmlEscaped()), &dlg);
+    baseLbl->setWordWrap(true);
+    lay->addWidget(baseLbl);
+
+    auto *table = new QTableWidget(&dlg);
+    table->setColumnCount(2);
+    table->setHorizontalHeaderLabels({ QStringLiteral("参数名"), QStringLiteral("值") });
+    table->horizontalHeader()->setStretchLastSection(true);
+    const QUrlQuery query(url);
+    const auto items = query.queryItems(QUrl::FullyDecoded);
+    table->setRowCount(items.size() + 1);   // 多一行用于新增
+    for (int i = 0; i < items.size(); ++i) {
+        table->setItem(i, 0, new QTableWidgetItem(items[i].first));
+        table->setItem(i, 1, new QTableWidgetItem(items[i].second));
+    }
+    lay->addWidget(table);
+
+    auto *row = new QHBoxLayout;
+    auto *addBtn = new QPushButton(QStringLiteral("添加一行"), &dlg);
+    auto *delBtn = new QPushButton(QStringLiteral("删除选中"), &dlg);
+    row->addWidget(addBtn);
+    row->addWidget(delBtn);
+    row->addStretch();
+    lay->addLayout(row);
+
+    connect(addBtn, &QPushButton::clicked, &dlg, [table]() {
+        table->insertRow(table->rowCount());
+    });
+    connect(delBtn, &QPushButton::clicked, &dlg, [table]() {
+        const int r = table->currentRow();
+        if (r >= 0)
+            table->removeRow(r);
+    });
+
+    auto *btns = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    btns->button(QDialogButtonBox::Ok)->setText(QStringLiteral("应用并刷新"));
+    btns->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("取消"));
+    lay->addWidget(btns);
+    connect(btns, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(btns, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    QUrlQuery newQuery;
+    for (int i = 0; i < table->rowCount(); ++i) {
+        auto *kItem = table->item(i, 0);
+        auto *vItem = table->item(i, 1);
+        const QString key = kItem ? kItem->text().trimmed() : QString();
+        if (key.isEmpty())
+            continue;
+        newQuery.addQueryItem(key, vItem ? vItem->text() : QString());
+    }
+    url.setQuery(newQuery);
+    v->setUrl(url);
+    m_urlBar->setText(url.toString());
+    statusBar()->showMessage(QStringLiteral("URL 参数已更新"), 2000);
 }
 
 void BrowserWindow::togglePinTab(int index)

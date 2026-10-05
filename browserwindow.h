@@ -200,6 +200,7 @@ private slots:
     void showBlockedDetails();             // 盾牌点击：查看已拦截列表
     void togglePinTab(int index);          // 固定/取消固定标签
     void showTabOverview();                // 标签总览网格
+    void showUrlParamEditor();             // URL 参数编辑器
     void setTabAutoRefresh(WebView *view, int seconds);  // 定时刷新（0=关闭）
 
     // ---- 导航 ----
